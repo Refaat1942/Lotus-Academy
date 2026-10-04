@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { ContentStatus, CourseLevel } from "@prisma/client";
 import { sendMail } from "@/lib/mail";
+import { validateBrandUpload } from "@/lib/brand";
 
 type State = { error?: string; ok?: string } | null;
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
@@ -361,4 +362,33 @@ export async function broadcastAction(_: State, fd: FormData): Promise<State> {
   }
   await audit(user.id, "notification.broadcast", "Notification", undefined, { recipients: users.length });
   return { ok: `Sent to ${users.length} learner(s).` };
+}
+
+// ---------- Brand assets ----------
+export async function uploadBrandAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("settings.write");
+  const slot = String(fd.get("slot"));
+  if (slot !== "logo" && slot !== "favicon") return { error: "Unknown slot." };
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image file." };
+  const buf = Buffer.from(await file.arrayBuffer());
+  const v = validateBrandUpload(buf);
+  if (!v.ok) return { error: v.error };
+  const data = new Uint8Array(buf);
+  await db.brandAsset.upsert({
+    where: { key: slot },
+    update: { mime: v.mime, data, sizeBytes: buf.length, fileName: file.name.slice(0, 200) },
+    create: { key: slot, mime: v.mime, data, sizeBytes: buf.length, fileName: file.name.slice(0, 200) },
+  });
+  await audit(user.id, "brand.upload", "BrandAsset", slot, { mime: v.mime, bytes: buf.length });
+  revalidatePath("/", "layout");
+  return { ok: `${slot === "logo" ? "Logo" : "Favicon"} updated (${v.mime}, ${Math.round(buf.length / 1024)} KB).` };
+}
+
+export async function removeBrandAction(fd: FormData) {
+  const user = await assertPermission("settings.write");
+  const slot = String(fd.get("slot"));
+  await db.brandAsset.deleteMany({ where: { key: slot } });
+  await audit(user.id, "brand.remove", "BrandAsset", slot);
+  revalidatePath("/", "layout");
 }

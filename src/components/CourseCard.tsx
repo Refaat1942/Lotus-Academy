@@ -1,36 +1,42 @@
 import Link from "next/link";
-import { BookOpen, Clock } from "lucide-react";
+import { ArrowUpRight, BookOpen, Clock } from "lucide-react";
 import { Badge, Progress, fmtDuration } from "./ui";
+import { categoryIcon } from "./icons";
 import type { CourseListItem } from "@/lib/catalog";
 import { pick, type Locale, type MessageKey } from "@/i18n";
 
 export function CourseCard({ c, locale, t, progress }: { c: CourseListItem; locale: Locale; t: (k: MessageKey) => string; progress?: { percent: number; status: string } }) {
   const inst = c.instructors[0]?.instructor.user;
+  const Icon = categoryIcon(c.category?.slug);
   return (
-    <article className="card relative flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md">
-      <div className="h-2 bg-gradient-to-r from-primary to-primary-light" aria-hidden />
+    <article className="group card relative flex h-full flex-col overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lift">
+      {/* Cover: brand gradient with the category icon (replace with an uploaded thumbnail later) */}
+      <div className="relative flex h-36 items-end overflow-hidden bg-gradient-to-br from-primary to-primary-dark p-4">
+        {c.thumbnailUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+        <Icon size={120} strokeWidth={1.1} className="absolute -end-4 -top-4 text-white/15" aria-hidden />
+        <div className="relative flex flex-wrap gap-2">
+          {c.category && <span className="badge bg-white/95 text-primary-dark">{pick(locale, c.category.nameEn, c.category.nameAr)}</span>}
+          <span className="badge bg-black/25 text-white backdrop-blur">{t(`level.${c.level}` as MessageKey)}</span>
+        </div>
+      </div>
       <div className="flex flex-1 flex-col p-5">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {c.category && <Badge tone="primary">{pick(locale, c.category.nameEn, c.category.nameAr)}</Badge>}
-          <Badge>{t(`level.${c.level}` as MessageKey)}</Badge>
-        </div>
-        <h3 className="text-lg font-semibold leading-snug text-text">
-          <Link href={`/courses/${c.slug}`} className="after:absolute hover:text-primary">{pick(locale, c.titleEn, c.titleAr)}</Link>
+        <h3 className="text-lg font-bold leading-snug text-text">
+          <Link href={`/courses/${c.slug}`} className="after:absolute after:inset-0 group-hover:text-primary">{pick(locale, c.titleEn, c.titleAr)}</Link>
         </h3>
-        <p dir="auto" className="mt-2 line-clamp-3 flex-1 text-sm text-muted">{pick(locale, c.summaryEn, c.summaryAr)}</p>
-        <p className="mt-3 text-xs text-muted">{inst ? `${inst.firstName} ${inst.lastName}` : t("courses.noInstructor")}</p>
+        <p dir="auto" className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-muted">{pick(locale, c.summaryEn, c.summaryAr)}</p>
+        <p className="mt-3 text-xs font-medium text-muted">{inst ? `${inst.firstName} ${inst.lastName}` : t("courses.noInstructor")}</p>
         <div className="mt-3 flex items-center gap-4 text-xs text-muted">
-          <span className="inline-flex items-center gap-1"><BookOpen size={14} aria-hidden />{c._count.lessons} {t("common.lessons")}</span>
-          <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden />{fmtDuration(c.durationMinutes, t)}</span>
+          <span className="inline-flex items-center gap-1.5"><BookOpen size={14} aria-hidden />{c._count.lessons} {t("common.lessons")}</span>
+          <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden />{fmtDuration(c.durationMinutes, t)}</span>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 border-t border-border pt-4">
           {progress ? (
             <>
-              <div className="mb-1 flex justify-between text-xs"><span>{progress.status === "COMPLETED" ? t("courses.completed") : t("courses.enrolled")}</span><span>{progress.percent}%</span></div>
+              <div className="mb-1.5 flex justify-between text-xs font-medium"><span>{progress.status === "COMPLETED" ? t("courses.completed") : t("courses.enrolled")}</span><span>{progress.percent}%</span></div>
               <Progress value={progress.percent} />
             </>
           ) : (
-            <span className="text-sm font-semibold text-primary">{t("courses.enroll")} →</span>
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">{t("courses.enroll")} <ArrowUpRight size={16} aria-hidden className="rtl:-scale-x-100" /></span>
           )}
         </div>
       </div>

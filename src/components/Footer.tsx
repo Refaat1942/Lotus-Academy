@@ -5,7 +5,7 @@ import { getT } from "@/i18n";
 export async function Footer() {
   const { t } = await getT();
   return (
-    <footer className="mt-24 bg-primary-dark text-white">
+    <footer className="mt-24 rounded-t-[2.5rem] bg-primary-dark text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3">
         <div>
           <Logo light />

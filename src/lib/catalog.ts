@@ -47,7 +47,7 @@ export async function listCourses(query: CourseQuery) {
       where, orderBy, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
       select: {
         id: true, slug: true, titleEn: true, titleAr: true, summaryEn: true, summaryAr: true, level: true, durationMinutes: true, thumbnailUrl: true,
-        category: { select: { nameEn: true, nameAr: true } },
+        category: { select: { slug: true, nameEn: true, nameAr: true } },
         instructors: { select: { instructor: { select: { user: { select: { firstName: true, lastName: true } } } } }, take: 1 },
         _count: { select: { lessons: { where: { status: "PUBLISHED", deletedAt: null } } } },
       },

@@ -552,3 +552,12 @@ model ImportArchive {
   @@index([sha256])
   @@index([contentHash])
 }
+
+model BrandAsset {
+  key       String   @id // "logo" | "favicon"
+  mime      String
+  data      Bytes
+  sizeBytes Int
+  fileName  String?
+  updatedAt DateTime @updatedAt
+}

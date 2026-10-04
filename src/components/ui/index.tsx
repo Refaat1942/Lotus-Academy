@@ -13,7 +13,7 @@ export function StatCard({ label, value, hint }: { label: string; value: React.R
   return (
     <div className="card p-5">
       <div className="text-sm text-muted">{label}</div>
-      <div className="mt-1 text-3xl font-semibold tracking-tight text-primary-dark">{value}</div>
+      <div className="mt-1 text-3xl font-extrabold tracking-tight text-primary-dark">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );
@@ -43,10 +43,10 @@ export function EmptyState({ title, description, action }: { title: string; desc
 
 export function PageHeader({ title, lead, eyebrow }: { title: string; lead?: string; eyebrow?: string }) {
   return (
-    <div className="border-b border-border bg-surface">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        {eyebrow && <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-secondary">{eyebrow}</p>}
-        <h1 className="text-3xl font-semibold tracking-tight text-primary-dark sm:text-4xl">{title}</h1>
+    <div className="border-b border-border bg-gradient-to-b from-primary-light to-background">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+        {eyebrow && <p className="mb-2 text-xs font-bold uppercase tracking-widest text-secondary">{eyebrow}</p>}
+        <h1 className="text-3xl font-extrabold tracking-tight text-primary-dark sm:text-4xl">{title}</h1>
         {lead && <p className="mt-3 max-w-2xl text-lg text-muted">{lead}</p>}
       </div>
     </div>

@@ -52,7 +52,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
   return (
     <>
-      <section className="border-b border-border bg-primary-dark text-white">
+      <section className="bg-gradient-to-br from-primary to-primary-dark text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <nav aria-label="Breadcrumb" className="mb-4 text-sm text-white/70"><Link href="/courses" className="hover:text-white">{t("nav.courses")}</Link> / {course.category && pick(locale, course.category.nameEn, course.category.nameAr)}</nav>

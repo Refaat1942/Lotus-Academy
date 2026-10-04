@@ -1,5 +1,7 @@
 export const en = {
+  "search.placeholder": "I'm looking for a course, topic or drug class…",
   "brand.name": "LOTUS ACADEMY",
+  "brand.academy": "Academy",
   "brand.subtitle": "Pharmacy Education & Professional Development",
   "nav.home": "Home", "nav.courses": "Courses", "nav.categories": "Categories", "nav.instructors": "Instructors",
   "nav.about": "About", "nav.faq": "FAQ", "nav.contact": "Contact", "nav.login": "Sign in", "nav.register": "Create account",

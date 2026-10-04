@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getT } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { getBrand } from "@/lib/brand";
 import { PrintButton } from "@/components/PrintButton";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +18,15 @@ export default async function CertificatePage({ params }: { params: Promise<{ ce
   if (!cert) notFound();
   const issuer = await db.systemSetting.findUnique({ where: { key: "certificate.issuer" } });
   const issuerName = (issuer?.value as { en?: string } | null)?.en ?? "Lotus Academy";
+  const brand = await getBrand();
   const url = `${env.appUrl()}/verify/certificate/${cert.publicId}`;
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <div className="mb-4 flex justify-end print:hidden"><PrintButton label={t("cert.print")} /></div>
       <div className="relative border-[10px] border-double border-primary bg-surface p-10 text-center shadow-card sm:p-16" dir="ltr">
-        <Image src="/brand/lotus-mark.svg" alt="" width={64} height={64} className="mx-auto" unoptimized />
+        {brand.logo
+          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/brand/logo?v=${brand.logo}`} alt="" className="mx-auto h-16 w-auto" />
+          : <Image src="/brand/lotus-mark.svg" alt="" width={64} height={64} className="mx-auto" unoptimized />}
         <p className="mt-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-dark">LOTUS ACADEMY</p>
         <h1 className="mt-8 font-serif text-4xl text-primary-dark">{t("cert.title")}</h1>
         <p className="mt-8 text-muted">{t("cert.certify")}</p>

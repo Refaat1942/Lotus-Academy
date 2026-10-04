@@ -1,7 +1,9 @@
 import type { MessageKey } from "./en";
 
 export const ar: Record<MessageKey, string> = {
+  "search.placeholder": "أبحث عن دورة أو موضوع أو مجموعة دوائية…",
   "brand.name": "أكاديمية لوتس",
+  "brand.academy": "الأكاديمية",
   "brand.subtitle": "للتعليم والتطوير المهني للصيادلة",
   "nav.home": "الرئيسية", "nav.courses": "الدورات", "nav.categories": "التصنيفات", "nav.instructors": "المحاضرون",
   "nav.about": "من نحن", "nav.faq": "الأسئلة الشائعة", "nav.contact": "تواصل معنا", "nav.login": "تسجيل الدخول", "nav.register": "إنشاء حساب",
