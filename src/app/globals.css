@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * LOTUS ACADEMY DESIGN TOKENS (RGB triplets so Tailwind opacity modifiers work).
+ * PROVISIONAL palette: the official lotusonline.com palette could not be fetched
+ * from the build environment. Replace the values below with the official brand
+ * colors; no other file contains raw colors.
+ */
+:root {
+  --primary: 14 94 87;
+  --primary-dark: 8 61 57;
+  --primary-light: 224 242 239;
+  --secondary: 176 56 105;
+  --background: 248 249 250;
+  --surface: 255 255 255;
+  --text: 22 30 38;
+  --muted: 100 112 122;
+  --border: 224 228 232;
+  --success: 22 128 74;
+  --warning: 181 110 10;
+  --error: 190 38 38;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, serif;
+}
+[dir="rtl"] { --font-sans: "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, sans-serif; }
+
+html { -webkit-text-size-adjust: 100%; }
+body { @apply bg-background text-text font-sans antialiased; }
+:focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-primary text-white hover:bg-primary-dark; }
+  .btn-secondary { @apply btn border border-border bg-surface text-text hover:bg-primary-light; }
+  .btn-danger { @apply btn bg-error text-white hover:opacity-90; }
+  .input { @apply w-full rounded border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none; }
+  .label { @apply mb-1.5 block text-sm font-medium text-text; }
+  .card { @apply rounded-lg border border-border bg-surface shadow-card; }
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .prose-lotus { @apply max-w-none leading-7 text-text; }
+  .prose-lotus h2 { @apply mt-10 mb-3 text-xl font-semibold text-primary-dark; }
+  .prose-lotus h3 { @apply mt-6 mb-2 text-lg font-semibold; }
+  .prose-lotus p { @apply my-3; }
+  .prose-lotus ul { @apply my-3 list-disc ps-6; }
+  .prose-lotus ol { @apply my-3 list-decimal ps-6; }
+  .prose-lotus li { @apply my-1; }
+  .prose-lotus a { @apply text-primary underline; }
+  .prose-lotus blockquote { @apply my-4 border-s-4 border-primary bg-primary-light/50 px-4 py-2 text-muted; }
+  .prose-lotus table { @apply my-5 block w-full overflow-x-auto text-sm; border-collapse: collapse; }
+  .prose-lotus th { @apply border border-border bg-primary-light px-3 py-2 text-start font-semibold; }
+  .prose-lotus td { @apply border border-border px-3 py-2 align-top; }
+  .prose-lotus code { @apply rounded bg-background px-1 py-0.5 text-[0.9em]; }
+  .prose-lotus hr { @apply my-8 border-border; }
+}
