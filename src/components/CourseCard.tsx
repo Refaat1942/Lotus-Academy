@@ -17,7 +17,7 @@ export function CourseCard({ c, locale, t, progress }: { c: CourseListItem; loca
         <h3 className="text-lg font-semibold leading-snug text-text">
           <Link href={`/courses/${c.slug}`} className="after:absolute hover:text-primary">{pick(locale, c.titleEn, c.titleAr)}</Link>
         </h3>
-        <p className="mt-2 line-clamp-3 flex-1 text-sm text-muted">{pick(locale, c.summaryEn, c.summaryAr)}</p>
+        <p dir="auto" className="mt-2 line-clamp-3 flex-1 text-sm text-muted">{pick(locale, c.summaryEn, c.summaryAr)}</p>
         <p className="mt-3 text-xs text-muted">{inst ? `${inst.firstName} ${inst.lastName}` : t("courses.noInstructor")}</p>
         <div className="mt-3 flex items-center gap-4 text-xs text-muted">
           <span className="inline-flex items-center gap-1"><BookOpen size={14} aria-hidden />{c._count.lessons} {t("common.lessons")}</span>

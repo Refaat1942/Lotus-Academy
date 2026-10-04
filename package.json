@@ -12,7 +12,10 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "import:courses": "tsx scripts/import-courses.ts",
-    "create:admin": "tsx scripts/create-admin.ts"
+    "create:admin": "tsx scripts/create-admin.ts",
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "test:e2e": "playwright test",
+    "test:all": "vitest run && bash scripts/test-db.sh && vitest run --config vitest.int.config.ts && playwright test"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

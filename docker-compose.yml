@@ -1,0 +1,47 @@
+# Isolated project: run with `docker compose -p lotus-academy ...` (name below is fixed on purpose).
+name: lotus-academy
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lotus_academy}
+      POSTGRES_USER: ${POSTGRES_USER:-lotus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - lotus_pgdata:/var/lib/postgresql/data
+    networks: [internal]          # no published ports: PostgreSQL is NOT reachable from the host or internet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: lotus-academy-app:latest
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lotus}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-lotus_academy}?schema=public
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:15169:15169"   # loopback only; Nginx proxies public traffic here
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:15169/api/health/db').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+networks:
+  internal:
+    name: lotus_academy_internal
+
+volumes:
+  lotus_pgdata:
+    name: lotus_academy_pgdata

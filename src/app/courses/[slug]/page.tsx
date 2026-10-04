@@ -57,7 +57,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
           <div className="lg:col-span-2">
             <nav aria-label="Breadcrumb" className="mb-4 text-sm text-white/70"><Link href="/courses" className="hover:text-white">{t("nav.courses")}</Link> / {course.category && pick(locale, course.category.nameEn, course.category.nameAr)}</nav>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-            <p className="mt-4 max-w-2xl text-white/85">{pick(locale, course.summaryEn, course.summaryAr)}</p>
+            <p dir="auto" className="mt-4 max-w-2xl text-white/85">{pick(locale, course.summaryEn, course.summaryAr)}</p>
             <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-white/85">
               <span className="inline-flex items-center gap-1.5"><BookOpen size={16} aria-hidden />{lessons.length} {t("common.lessons")}</span>
               <span className="inline-flex items-center gap-1.5"><Clock size={16} aria-hidden />{fmtDuration(course.durationMinutes, t)}</span>
@@ -83,10 +83,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-6 lg:grid-cols-3">
         <div className="space-y-12 lg:col-span-2">
-          {course.descriptionEn && <section><p className="text-lg leading-8 text-text/90">{pick(locale, course.descriptionEn, course.descriptionAr)}</p></section>}
+          {course.descriptionEn && <section><p dir="auto" className="text-lg leading-8 text-text/90">{pick(locale, course.descriptionEn, course.descriptionAr)}</p></section>}
           {objectives.length > 0 && (
             <section><h2 className="mb-4 text-xl font-semibold text-primary-dark">{t("courses.objectives")}</h2>
-              <ul className="grid gap-3 sm:grid-cols-2">{objectives.map((o) => <li key={o} className="card p-4 text-sm">{strip(o)}</li>)}</ul></section>
+              <ul className="grid gap-3 sm:grid-cols-2">{objectives.map((o) => <li key={o} dir="auto" className="card p-4 text-sm">{strip(o)}</li>)}</ul></section>
           )}
           <section><h2 className="mb-4 text-xl font-semibold text-primary-dark">{t("courses.curriculum")}</h2>
             {course.modules.map((m) => (

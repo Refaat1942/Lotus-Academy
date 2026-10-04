@@ -48,7 +48,7 @@ export function readArchive(filePath: string): ArchiveRecord {
   const files = new Map<string, Buffer>();
   for (const e of entries) {
     if (e.isDirectory) continue;
-    const name = e.entryName.replace(/\\/g, "/");
+    const name = e.rawEntryName.toString("utf8").replace(/\\/g, "/");
     if (name.startsWith("/") || name.split("/").includes("..") || /^[a-zA-Z]:/.test(name)) {
       throw new Error(`${filePath}: unsafe entry path "${name}"`);
     }

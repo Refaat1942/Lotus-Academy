@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -11,8 +10,8 @@ import { PERMISSIONS } from "./permissions";
 export const SESSION_COOKIE = "la_session";
 const SESSION_DAYS = 14;
 
-export const hashPassword = (pw: string) => bcrypt.hash(pw, 12);
-export const verifyPassword = (pw: string, hash: string) => bcrypt.compare(pw, hash);
+export { hashPassword, verifyPassword } from "./auth-core";
+import { verifyPassword } from "./auth-core";
 
 export { passwordProblem } from "./password";
 
