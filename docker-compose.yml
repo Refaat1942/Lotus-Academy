@@ -29,7 +29,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-lotus}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-lotus_academy}?schema=public
       NODE_ENV: production
     ports:
-      - "127.0.0.1:15169:15169"   # loopback only; Nginx proxies public traffic here
+      - "${BIND_ADDR:-127.0.0.1}:15169:15169"   # default loopback (behind Nginx); set BIND_ADDR=0.0.0.0 to expose directly
     networks: [internal]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:15169/api/health/db').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
