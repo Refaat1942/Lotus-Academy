@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_: Request, { params }: { params: Promise<{ slot: string }> }) {
   const { slot } = await params;
-  if (!(BRAND_SLOTS as readonly string[]).includes(slot)) return new Response("Not found", { status: 404 });
+  if (!(BRAND_SLOTS as readonly string[]).includes(slot) && !/^course-[a-z0-9]{10,40}$/.test(slot)) return new Response("Not found", { status: 404 });
   const a = await db.brandAsset.findUnique({ where: { key: slot } });
   if (!a) return new Response("Not found", { status: 404 });
   return new Response(new Uint8Array(a.data), {

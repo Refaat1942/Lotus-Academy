@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { audit } from "./audit";
-import { computeCompletion, gradeQuiz, attemptsRemaining } from "./domain";
+import { computeCompletion, gradeQuiz, attemptsRemaining, buildCheckpointPool, drawCheckpoint, type PoolQuestion } from "./domain";
 import { newCertificateId } from "./tokens";
 import { sendMail } from "./mail";
 import { env } from "./env";
@@ -86,16 +86,78 @@ export async function markLessonViewed(userId: string, lessonId: string) {
   await db.enrollment.update({ where: { userId_courseId: { userId, courseId: lesson.courseId } }, data: { lastLessonId: lessonId } });
 }
 
+async function checkpointPool(lessonId: string): Promise<PoolQuestion[]> {
+  const qs = await db.quizQuestion.findMany({
+    where: { quiz: { lessonId } }, orderBy: { position: "asc" },
+    select: { id: true, promptEn: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, isCorrect: true } } },
+  });
+  return buildCheckpointPool(qs);
+}
+
+export interface CheckpointState {
+  required: boolean;
+  passed: boolean;
+  attempts: number;
+  /** Questions without the isCorrect flag (never sent to the browser). */
+  questions: { id: string; prompt: string; multi: boolean; options: { id: string; text: string }[] }[];
+}
+
+/** Returns (drawing if needed) the learner's current checkpoint for a lesson. */
+export async function getCheckpoint(userId: string, lessonId: string): Promise<CheckpointState> {
+  const lesson = await db.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { requireCheckpoint: true } });
+  const none: CheckpointState = { required: false, passed: false, attempts: 0, questions: [] };
+  if (!lesson.requireCheckpoint) return none;
+  const pool = await checkpointPool(lessonId);
+  if (!pool.length) return none;
+  let row = await db.lessonCheckpoint.findUnique({ where: { userId_lessonId: { userId, lessonId } } });
+  if (row?.passedAt) return { required: true, passed: true, attempts: row.attempts, questions: [] };
+  const valid = new Set(pool.map((q) => q.id));
+  if (!row || !row.questionIds.length || !row.questionIds.every((id) => valid.has(id))) {
+    const ids = drawCheckpoint(pool, 2);
+    row = await db.lessonCheckpoint.upsert({ where: { userId_lessonId: { userId, lessonId } }, update: { questionIds: ids }, create: { userId, lessonId, questionIds: ids } });
+  }
+  const byId = new Map(pool.map((q) => [q.id, q]));
+  return {
+    required: true, passed: false, attempts: row.attempts,
+    questions: row.questionIds.map((id) => byId.get(id)!).map((q) => ({ id: q.id, prompt: q.prompt, multi: q.options.filter((o) => o.isCorrect).length > 1, options: q.options.map((o) => ({ id: o.id, text: o.text })) })),
+  };
+}
+
+/** Grades the drawn checkpoint. Every question must be right; on success the lesson is completed. On failure a fresh draw is made. */
+export async function submitCheckpoint(userId: string, lessonId: string, answers: Record<string, string[]>) {
+  const lesson = await db.lesson.findFirst({ where: { id: lessonId, status: "PUBLISHED", deletedAt: null } });
+  if (!lesson) throw new Error("Lesson not found");
+  await requireActiveEnrollment(userId, lesson.courseId);
+  const row = await db.lessonCheckpoint.findUnique({ where: { userId_lessonId: { userId, lessonId } } });
+  if (!row || !row.questionIds.length) throw new Error("No checkpoint in progress");
+  const pool = (await checkpointPool(lessonId)).filter((q) => row.questionIds.includes(q.id));
+  const graded = gradeQuiz(pool.map((q) => ({ id: q.id, points: 1, options: q.options })), answers, 100);
+  if (!graded.passed) {
+    await db.lessonCheckpoint.update({ where: { id: row.id }, data: { attempts: { increment: 1 }, questionIds: [] } });
+    return { passed: false };
+  }
+  await db.lessonCheckpoint.update({ where: { id: row.id }, data: { passedAt: new Date(), attempts: { increment: 1 } } });
+  await markLessonComplete(userId, lesson.id, lesson.courseId);
+  return { passed: true };
+}
+
+async function markLessonComplete(userId: string, lessonId: string, courseId: string) {
+  await db.lessonProgress.upsert({
+    where: { userId_lessonId: { userId, lessonId } },
+    update: { completedAt: new Date() },
+    create: { userId, lessonId, courseId, completedAt: new Date() },
+  });
+  return recomputeCourse(userId, courseId);
+}
+
+/** Manual completion is only allowed for lessons without a required checkpoint. */
 export async function completeLesson(userId: string, lessonId: string) {
   const lesson = await db.lesson.findFirst({ where: { id: lessonId, status: "PUBLISHED", deletedAt: null } });
   if (!lesson) throw new Error("Lesson not found");
   await requireActiveEnrollment(userId, lesson.courseId);
-  await db.lessonProgress.upsert({
-    where: { userId_lessonId: { userId, lessonId } },
-    update: { completedAt: new Date() },
-    create: { userId, lessonId, courseId: lesson.courseId, completedAt: new Date() },
-  });
-  return recomputeCourse(userId, lesson.courseId);
+  const cp = await getCheckpoint(userId, lessonId);
+  if (cp.required && !cp.passed) throw new Error("Checkpoint required");
+  return markLessonComplete(userId, lessonId, lesson.courseId);
 }
 
 export async function submitQuiz(userId: string, quizId: string, submitted: Record<string, string[]>) {

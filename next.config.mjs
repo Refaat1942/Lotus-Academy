@@ -20,7 +20,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 export default {
   poweredByHeader: false,
   reactStrictMode: true,
-  experimental: { serverActions: { bodySizeLimit: "4mb" } },
+  experimental: { serverActions: { bodySizeLimit: "20mb" } },
   serverExternalPackages: ["@prisma/client", "bcryptjs", "adm-zip"],
   webpack(config) {
     // TypeScript 7 dropped baseUrl, so the "@/" alias is declared here as well as in tsconfig "paths".
@@ -30,8 +30,8 @@ export default {
   async headers() {
     return [
       {
-        // /api/brand serves user-uploaded images and sets its own, stricter (sandboxed) CSP.
-        source: "/((?!api/brand).*)",
+        // /api/brand and /api/files serve user-uploaded files and set their own, stricter (sandboxed) CSP.
+        source: "/((?!api/brand|api/files).*)",
         headers: [{ key: "Content-Security-Policy", value: csp }],
       },
       {

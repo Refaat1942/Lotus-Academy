@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { ContentStatus, CourseLevel } from "@prisma/client";
 import { sendMail } from "@/lib/mail";
 import { validateBrandUpload } from "@/lib/brand";
+import { safeFileName, validateMaterial } from "@/lib/materials";
 
 type State = { error?: string; ok?: string } | null;
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
@@ -36,6 +37,7 @@ const courseSchema = z.object({
   level: z.nativeEnum(CourseLevel),
   durationMinutes: z.coerce.number().int().min(0).max(100000),
   passMark: z.coerce.number().int().min(0).max(100),
+  sequential: z.string().optional(),
   thumbnailUrl: z.string().trim().max(500).refine((v) => !v || /^(https:\/\/|\/(?![\/\\]))/.test(v), "Thumbnail must be an https URL or a /path").optional(),
 });
 
@@ -43,9 +45,17 @@ export async function createCourseAction(_: State, fd: FormData): Promise<State>
   const user = await assertPermission("courses.write");
   const title = String(fd.get("titleEn") ?? "").trim();
   if (title.length < 2) return { error: "Title is required." };
+  const level = z.nativeEnum(CourseLevel).catch("INTERMEDIATE").parse(fd.get("level"));
+  const categoryId = String(fd.get("categoryId") ?? "") || null;
   let slug = slugify(title) || "course";
   if (await db.course.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
-  const c = await db.course.create({ data: { slug, titleEn: title, status: "DRAFT", modules: { create: { position: 1, titleEn: "Course lessons", titleAr: "دروس الدورة" } } } });
+  const c = await db.course.create({
+    data: {
+      slug, titleEn: title, titleAr: String(fd.get("titleAr") ?? "").trim() || null, level, categoryId, status: "DRAFT",
+      modules: { create: { position: 1, titleEn: "Getting started", titleAr: "البداية" } },
+    },
+  });
+  if (!isManager(user)) await db.courseInstructor.create({ data: { courseId: c.id, instructorId: (await db.instructorProfile.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id } })).userId } });
   await audit(user.id, "course.create", "Course", c.id);
   redirect(`/admin/courses/${c.id}`);
 }
@@ -63,7 +73,7 @@ export async function updateCourseAction(_: State, fd: FormData): Promise<State>
       titleEn: d.titleEn, titleAr: d.titleAr || null, summaryEn: d.summaryEn || null, summaryAr: d.summaryAr || null,
       descriptionEn: d.descriptionEn || null, descriptionAr: d.descriptionAr || null,
       objectivesEn: lines(d.objectivesEn ?? ""), objectivesAr: lines(d.objectivesAr ?? ""), prerequisitesEn: d.prerequisitesEn || null,
-      categoryId: d.categoryId || null, level: d.level, durationMinutes: d.durationMinutes, passMark: d.passMark, thumbnailUrl: d.thumbnailUrl || null,
+      categoryId: d.categoryId || null, sequential: d.sequential === "on", level: d.level, durationMinutes: d.durationMinutes, passMark: d.passMark, thumbnailUrl: d.thumbnailUrl || null,
     },
   });
   await audit(user.id, "course.update", "Course", id);
@@ -114,6 +124,7 @@ const lessonSchema = z.object({
   objectives: z.string().max(5000).optional(),
   status: z.nativeEnum(ContentStatus),
   isPreview: z.string().optional(),
+  requireCheckpoint: z.string().optional(),
 });
 
 export async function updateLessonAction(_: State, fd: FormData): Promise<State> {
@@ -126,33 +137,176 @@ export async function updateLessonAction(_: State, fd: FormData): Promise<State>
   await assertCourseAccess(user, (await db.lesson.findUniqueOrThrow({ where: { id } })).courseId);
   const lesson = await db.lesson.update({
     where: { id },
-    data: { titleEn: d.titleEn, titleAr: d.titleAr || null, bodyMd: d.bodyMd, durationMinutes: d.durationMinutes, objectives: lines(d.objectives ?? ""), status: d.status, isPreview: d.isPreview === "on", searchText: `${d.titleEn} ${d.bodyMd}`.slice(0, 20000) },
+    data: { titleEn: d.titleEn, titleAr: d.titleAr || null, bodyMd: d.bodyMd, durationMinutes: d.durationMinutes, objectives: lines(d.objectives ?? ""), status: d.status, isPreview: d.isPreview === "on", requireCheckpoint: d.requireCheckpoint === "on", searchText: `${d.titleEn} ${d.bodyMd}`.slice(0, 20000) },
   });
   await audit(user.id, "lesson.update", "Lesson", id);
   revalidatePath(`/admin/courses/${lesson.courseId}`);
   return { ok: "Saved." };
 }
 
+/** Re-numbers lessons 1..N following module order, keeping the learner path consistent. */
+async function normalizeOrder(courseId: string) {
+  const mods = await db.courseModule.findMany({ where: { courseId }, orderBy: { position: "asc" }, include: { lessons: { where: { deletedAt: null }, orderBy: { position: "asc" }, select: { id: true } } } });
+  let n = 0;
+  const ops = mods.flatMap((m) => m.lessons.map((l) => db.lesson.update({ where: { id: l.id }, data: { position: ++n } })));
+  if (ops.length) await db.$transaction(ops);
+}
+
 export async function createLessonAction(fd: FormData) {
   const user = await assertPermission("lessons.write");
   const courseId = String(fd.get("courseId"));
   await assertCourseAccess(user, courseId);
-  const mod = await db.courseModule.findFirstOrThrow({ where: { courseId }, orderBy: { position: "asc" } });
-  const last = await db.lesson.findFirst({ where: { courseId }, orderBy: { position: "desc" } });
-  const position = (last?.position ?? 0) + 1;
-  const l = await db.lesson.create({ data: { courseId, moduleId: mod.id, slug: `lesson-${Date.now().toString(36)}`, titleEn: "New lesson", position, status: "DRAFT" } });
+  const wanted = String(fd.get("moduleId") ?? "");
+  const mod = (wanted && (await db.courseModule.findFirst({ where: { id: wanted, courseId } }))) || (await db.courseModule.findFirstOrThrow({ where: { courseId }, orderBy: { position: "asc" } }));
+  const l = await db.lesson.create({ data: { courseId, moduleId: mod.id, slug: `lesson-${Date.now().toString(36)}`, titleEn: "New lesson", position: 100000, status: "DRAFT" } });
+  await normalizeOrder(courseId);
   await audit(user.id, "lesson.create", "Lesson", l.id);
   redirect(`/admin/courses/${courseId}/lessons/${l.id}`);
 }
 
-/** Moves a lesson up/down by swapping positions inside a transaction (unique-safe via temporary park value). */
+// ---------- Pathway designer: modules ----------
+export async function addModuleAction(fd: FormData) {
+  const user = await assertPermission("lessons.write");
+  const courseId = String(fd.get("courseId"));
+  await assertCourseAccess(user, courseId);
+  const last = await db.courseModule.findFirst({ where: { courseId }, orderBy: { position: "desc" } });
+  const m = await db.courseModule.create({ data: { courseId, position: (last?.position ?? 0) + 1, titleEn: "New module" } });
+  await audit(user.id, "module.create", "CourseModule", m.id);
+  revalidatePath(`/admin/courses/${courseId}`);
+}
+
+export async function updateModuleAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("lessons.write");
+  const id = String(fd.get("id"));
+  const m = await db.courseModule.findUniqueOrThrow({ where: { id } });
+  await assertCourseAccess(user, m.courseId);
+  const titleEn = String(fd.get("titleEn") ?? "").trim();
+  if (!titleEn) return { error: "Module title is required." };
+  await db.courseModule.update({ where: { id }, data: { titleEn: titleEn.slice(0, 200), titleAr: String(fd.get("titleAr") ?? "").trim().slice(0, 200) || null, descriptionEn: String(fd.get("descriptionEn") ?? "").trim().slice(0, 600) || null, descriptionAr: String(fd.get("descriptionAr") ?? "").trim().slice(0, 600) || null } });
+  await audit(user.id, "module.update", "CourseModule", id);
+  revalidatePath(`/admin/courses/${m.courseId}`);
+  return { ok: "Saved." };
+}
+
+export async function moveModuleAction(fd: FormData) {
+  const user = await assertPermission("lessons.write");
+  const m = await db.courseModule.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+  await assertCourseAccess(user, m.courseId);
+  const up = fd.get("dir") === "up";
+  const other = await db.courseModule.findFirst({ where: { courseId: m.courseId, position: up ? { lt: m.position } : { gt: m.position } }, orderBy: { position: up ? "desc" : "asc" } });
+  if (!other) return;
+  await db.$transaction([
+    db.courseModule.update({ where: { id: m.id }, data: { position: -1 } }),
+    db.courseModule.update({ where: { id: other.id }, data: { position: m.position } }),
+    db.courseModule.update({ where: { id: m.id }, data: { position: other.position } }),
+  ]);
+  await normalizeOrder(m.courseId);
+  await audit(user.id, "module.reorder", "CourseModule", m.id);
+  revalidatePath(`/admin/courses/${m.courseId}`);
+}
+
+export async function deleteModuleAction(fd: FormData) {
+  const user = await assertPermission("lessons.write");
+  const m = await db.courseModule.findUniqueOrThrow({ where: { id: String(fd.get("id")) }, include: { _count: { select: { lessons: { where: { deletedAt: null } } } } } });
+  await assertCourseAccess(user, m.courseId);
+  if (m._count.lessons) throw new Error("Move or archive the lessons first.");
+  if ((await db.courseModule.count({ where: { courseId: m.courseId } })) <= 1) throw new Error("A course needs at least one module.");
+  await db.courseModule.delete({ where: { id: m.id } });
+  await audit(user.id, "module.delete", "CourseModule", m.id);
+  revalidatePath(`/admin/courses/${m.courseId}`);
+}
+
+export async function setLessonModuleAction(fd: FormData) {
+  const user = await assertPermission("lessons.write");
+  const l = await db.lesson.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+  await assertCourseAccess(user, l.courseId);
+  const target = await db.courseModule.findFirst({ where: { id: String(fd.get("moduleId")), courseId: l.courseId } });
+  if (!target || target.id === l.moduleId) return;
+  await db.lesson.update({ where: { id: l.id }, data: { moduleId: target.id, position: 100000 } });
+  await normalizeOrder(l.courseId);
+  await audit(user.id, "lesson.move_module", "Lesson", l.id, { module: target.id });
+  revalidatePath(`/admin/courses/${l.courseId}`);
+}
+
+// ---------- Materials (links and files) ----------
+export async function addMaterialLinkAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("lessons.write");
+  const lessonId = String(fd.get("lessonId"));
+  const lesson = await db.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  await assertCourseAccess(user, lesson.courseId);
+  const name = String(fd.get("name") ?? "").trim().slice(0, 150);
+  const url = String(fd.get("url") ?? "").trim();
+  if (!name || !/^https:\/\/[^\s]+$/.test(url)) return { error: "Provide a title and a valid https link." };
+  await db.lessonAsset.create({ data: { lessonId, kind: "LINK", name, url } });
+  await audit(user.id, "material.link", "Lesson", lessonId);
+  revalidatePath(`/admin/courses/${lesson.courseId}`);
+  return { ok: "Link added." };
+}
+
+export async function uploadMaterialAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("lessons.write");
+  const lessonId = String(fd.get("lessonId"));
+  const lesson = await db.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  await assertCourseAccess(user, lesson.courseId);
+  const file = fd.get("file");
+  if (!(file instanceof File) || !file.size) return { error: "Choose a file." };
+  const buf = Buffer.from(await file.arrayBuffer());
+  const v = validateMaterial(buf, file.name);
+  if (!v.ok) return { error: v.error };
+  const name = String(fd.get("name") ?? "").trim().slice(0, 150) || file.name.slice(0, 150);
+  const stored = await db.storedFile.create({ data: { name: safeFileName(file.name), mime: v.mime, data: new Uint8Array(buf), sizeBytes: buf.length } });
+  await db.lessonAsset.create({ data: { lessonId, kind: "FILE", name, fileId: stored.id, url: "", mimeType: v.mime, sizeBytes: buf.length } });
+  await audit(user.id, "material.upload", "Lesson", lessonId, { mime: v.mime, bytes: buf.length });
+  revalidatePath(`/admin/courses/${lesson.courseId}`);
+  return { ok: `Uploaded (${Math.round(buf.length / 1024)} KB).` };
+}
+
+export async function deleteMaterialAction(fd: FormData) {
+  const user = await assertPermission("lessons.write");
+  const a = await db.lessonAsset.findUniqueOrThrow({ where: { id: String(fd.get("id")) }, include: { lesson: true } });
+  await assertCourseAccess(user, a.lesson.courseId);
+  await db.lessonAsset.delete({ where: { id: a.id } });
+  if (a.fileId) await db.storedFile.deleteMany({ where: { id: a.fileId } });
+  await audit(user.id, "material.delete", "Lesson", a.lessonId);
+  revalidatePath(`/admin/courses/${a.lesson.courseId}`);
+}
+
+// ---------- Course cover ----------
+export async function uploadCourseCoverAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("courses.write");
+  const courseId = String(fd.get("courseId"));
+  await assertCourseAccess(user, courseId);
+  const file = fd.get("file");
+  if (!(file instanceof File) || !file.size) return { error: "Choose an image." };
+  const buf = Buffer.from(await file.arrayBuffer());
+  const v = validateBrandUpload(buf);
+  if (!v.ok) return { error: v.error };
+  const key = `course-${courseId}`;
+  const data = new Uint8Array(buf);
+  await db.brandAsset.upsert({ where: { key }, update: { mime: v.mime, data, sizeBytes: buf.length, fileName: file.name.slice(0, 200) }, create: { key, mime: v.mime, data, sizeBytes: buf.length, fileName: file.name.slice(0, 200) } });
+  await db.course.update({ where: { id: courseId }, data: { thumbnailUrl: `/api/brand/${key}?v=${Date.now()}` } });
+  await audit(user.id, "course.cover", "Course", courseId);
+  revalidatePath("/", "layout");
+  return { ok: "Cover updated." };
+}
+
+export async function removeCourseCoverAction(fd: FormData) {
+  const user = await assertPermission("courses.write");
+  const courseId = String(fd.get("courseId"));
+  await assertCourseAccess(user, courseId);
+  await db.brandAsset.deleteMany({ where: { key: `course-${courseId}` } });
+  await db.course.update({ where: { id: courseId }, data: { thumbnailUrl: null } });
+  revalidatePath("/", "layout");
+}
+
+/** Moves a lesson up/down inside its module by swapping positions (module order never changes). */
 export async function moveLessonAction(fd: FormData) {
   const user = await assertPermission("lessons.write");
   const id = String(fd.get("id"));
   const dir = fd.get("dir") === "up" ? -1 : 1;
   const l = await db.lesson.findUniqueOrThrow({ where: { id } });
   await assertCourseAccess(user, l.courseId);
-  const other = await db.lesson.findFirst({ where: { courseId: l.courseId, deletedAt: null, position: dir === -1 ? { lt: l.position } : { gt: l.position } }, orderBy: { position: dir === -1 ? "desc" : "asc" } });
+  const other = await db.lesson.findFirst({ where: { moduleId: l.moduleId, deletedAt: null, position: dir === -1 ? { lt: l.position } : { gt: l.position } }, orderBy: { position: dir === -1 ? "desc" : "asc" } });
   if (!other) return;
   await db.$transaction([
     db.lesson.update({ where: { id: l.id }, data: { position: -1 } }),

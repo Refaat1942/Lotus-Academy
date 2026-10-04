@@ -18,6 +18,7 @@
     "test:all": "vitest run && bash scripts/test-db.sh && vitest run --config vitest.int.config.ts && playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@prisma/client": "^6.19.3",
     "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.3",
@@ -26,6 +27,7 @@
     "marked": "^18.0.14",
     "next": "^15.5.27",
     "nodemailer": "^10.0.14",
+    "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sanitize-html": "^2.18.0",
@@ -37,6 +39,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.4",
     "@types/nodemailer": "^8.0.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/sanitize-html": "^2.16.2",

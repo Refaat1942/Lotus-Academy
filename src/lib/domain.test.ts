@@ -57,3 +57,34 @@ describe("certificate ids", () => {
     expect([...ids][0]).toMatch(/^LA-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
   });
 });
+
+import { buildCheckpointPool, drawCheckpoint, isLessonUnlocked } from "./domain";
+
+describe("checkpoint", () => {
+  const full = { id: "q1", promptEn: "Real?", options: [{ id: "a", textEn: "x", isCorrect: false }, { id: "b", textEn: "y", isCorrect: true }] };
+  const bare = (n: number) => ({ id: `b${n}`, promptEn: `Bare ${n}?`, options: [{ id: `o${n}`, textEn: `answer ${n}`, isCorrect: true }] });
+  it("keeps real questions and derives distractors for correct-only ones, deterministically", () => {
+    const qs = [full, bare(1), bare(2), bare(3), bare(4)];
+    const a = buildCheckpointPool(qs), b = buildCheckpointPool(qs);
+    expect(a).toEqual(b);
+    const derived = a.find((q) => q.id === "b1")!;
+    expect(derived.options).toHaveLength(4);
+    expect(derived.options.filter((o) => o.isCorrect).map((o) => o.text)).toEqual(["answer 1"]);
+    expect(new Set(derived.options.map((o) => o.text)).size).toBe(4);
+    expect(a.find((q) => q.id === "q1")!.options).toHaveLength(2);
+  });
+  it("skips questions without a correct answer or enough distractors", () => {
+    expect(buildCheckpointPool([bare(1)])).toEqual([]);
+    expect(buildCheckpointPool([{ id: "z", promptEn: "?", options: [{ id: "o", textEn: "t", isCorrect: false }] }])).toEqual([]);
+  });
+  it("draws distinct ids and locks lessons sequentially", () => {
+    const pool = buildCheckpointPool([full, bare(1), bare(2), bare(3)]);
+    const ids = drawCheckpoint(pool, 2);
+    expect(new Set(ids).size).toBe(2);
+    const ls = [{ id: "l1" }, { id: "l2" }, { id: "l3" }];
+    expect(isLessonUnlocked(ls, new Set(), 0)).toBe(true);
+    expect(isLessonUnlocked(ls, new Set(), 1)).toBe(false);
+    expect(isLessonUnlocked(ls, new Set(["l1"]), 1)).toBe(true);
+    expect(isLessonUnlocked(ls, new Set(["l1"]), 2)).toBe(false);
+  });
+});

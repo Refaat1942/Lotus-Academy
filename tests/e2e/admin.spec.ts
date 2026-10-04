@@ -17,14 +17,14 @@ test.describe.serial("admin journey", () => {
 
     await page.goto("/admin/courses");
     await page.getByLabel("Title (English)").fill(title);
-    await page.getByRole("button", { name: "Create draft" }).click();
+    await page.getByRole("button", { name: "Create course" }).click();
     await expect(page).toHaveURL(/\/admin\/courses\/[a-z0-9]+$/);
     await page.getByLabel("Summary (EN)").fill("An end-to-end test course.");
-    await page.getByLabel("Title (AR)").fill("دورة اختبار");
+    await page.locator("#titleAr").fill("دورة اختبار");
     await page.getByRole("button", { name: "Save course" }).click();
     await expect(page.getByRole("status")).toContainText("Saved");
 
-    await page.getByRole("button", { name: "Add lesson" }).click();
+    await page.getByRole("button", { name: /Add lesson/ }).first().click();
     await expect(page).toHaveURL(/lessons\//);
     await page.getByLabel("Title (EN)").fill("First lesson");
     await page.getByLabel("Content (Markdown)").fill("## Hello\n\nSome **bold** text and a <script>window.__xss=1</script> tag.");
@@ -52,7 +52,7 @@ test.describe.serial("admin journey", () => {
 
     const course = await db.course.findFirstOrThrow({ where: { titleEn: title } });
     await page.goto(`/admin/courses/${course.id}`);
-    await page.getByRole("button", { name: "Add lesson" }).click();
+    await page.getByRole("button", { name: /Add lesson/ }).first().click();
     await expect(page).toHaveURL(/lessons\//); // wait for the redirect before navigating away
     await page.goto(`/admin/courses/${course.id}`);
     await page.getByRole("button", { name: /Move New lesson up/ }).click();

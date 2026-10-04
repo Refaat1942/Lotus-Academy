@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function AdminCourses() {
   const me = await requirePermission("courses.read");
   const { t } = await getT();
+  const categories = await db.courseCategory.findMany({ orderBy: { sortOrder: "asc" } });
   const courses = await db.course.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: "asc" }, include: { category: true, _count: { select: { lessons: { where: { deletedAt: null } }, enrollments: true } } } });
   const tone = { PUBLISHED: "success", DRAFT: "warning", ARCHIVED: "neutral" } as const;
   return (
     <>
-      <AdminTitle title={t("admin.courses")} actions={<a className="btn-secondary" href="/api/admin/export/courses">{t("common.export")}</a>} />
+      <AdminTitle title={t("admin.courses")} actions={<><a className="btn-secondary" href="/api/admin/export/courses">{t("common.export")}</a>{me.permissions.has("courses.write") && <a className="btn-primary" href="#new-course">+ New course</a>}</>} />
       <Table caption={t("admin.courses")} head={["Code", "Title", "Category", t("admin.lessons"), "Enrolled", t("common.status"), t("common.actions")]}>
         {courses.map((c) => (
           <tr key={c.id}>
@@ -35,8 +36,14 @@ export default async function AdminCourses() {
         ))}
       </Table>
       {me.permissions.has("courses.write") && (
-        <section className="card mt-8 max-w-xl p-5"><h2 className="mb-3 font-semibold">New course</h2>
-          <ActionForm action={createCourseAction} submitLabel="Create draft" buttonClass="btn-primary"><div><label className="label" htmlFor="titleEn">Title (English)</label><input id="titleEn" name="titleEn" required minLength={2} maxLength={200} className="input" /></div></ActionForm></section>
+        <section id="new-course" className="card mt-8 max-w-3xl scroll-mt-32 p-6"><h2 className="mb-1 font-semibold">Create a new course</h2>
+          <p className="mb-4 text-sm text-muted">It is created as a draft. You will then add modules, lessons, videos and materials, and publish when ready.</p>
+          <ActionForm action={createCourseAction} submitLabel="Create course" buttonClass="btn-primary" className="grid gap-4 sm:grid-cols-2">
+            <div><label className="label" htmlFor="titleEn">Title (English)</label><input id="titleEn" name="titleEn" required minLength={2} maxLength={200} className="input" /></div>
+            <div><label className="label" htmlFor="titleAr">Title (Arabic)</label><input id="titleAr" name="titleAr" dir="rtl" maxLength={200} className="input" /></div>
+            <div><label className="label" htmlFor="categoryId">Category</label><select id="categoryId" name="categoryId" className="input"><option value="">—</option>{categories.map((k) => <option key={k.id} value={k.id}>{k.nameEn}</option>)}</select></div>
+            <div><label className="label" htmlFor="level">Level</label><select id="level" name="level" defaultValue="INTERMEDIATE" className="input"><option>BEGINNER</option><option>INTERMEDIATE</option><option>ADVANCED</option></select></div>
+          </ActionForm></section>
       )}
     </>
   );

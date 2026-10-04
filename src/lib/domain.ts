@@ -49,3 +49,67 @@ export function resumeLesson(
   if (lastLessonId && lessons.some((l) => l.id === lastLessonId) && !completed.has(lastLessonId)) return lastLessonId;
   return (lessons.find((l) => !completed.has(l.id)) ?? lessons[0]).id;
 }
+
+// ---------- Checkpoint ("check your understanding") ----------
+export interface SourceQuestion {
+  id: string;
+  promptEn: string;
+  options: { id: string; textEn: string; isCorrect: boolean }[];
+}
+export interface PoolQuestion {
+  id: string;
+  prompt: string;
+  options: { id: string; text: string; isCorrect: boolean }[];
+}
+
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const a = [...arr];
+  let s = hash(seed) || 1;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Builds the checkpoint question bank from a lesson's quiz questions. Questions with real distractors are used as-is.
+ * Questions that only carry their correct answer get deterministic distractors borrowed from the other questions'
+ * correct answers in the same lesson, so the server can always recompute the identical options.
+ */
+export function buildCheckpointPool(questions: SourceQuestion[]): PoolQuestion[] {
+  const correctTexts = [...new Set(questions.flatMap((q) => q.options.filter((o) => o.isCorrect).map((o) => o.textEn)))];
+  const pool: PoolQuestion[] = [];
+  for (const q of questions) {
+    const correct = q.options.filter((o) => o.isCorrect);
+    if (!correct.length) continue;
+    if (q.options.length >= 2) {
+      pool.push({ id: q.id, prompt: q.promptEn, options: q.options.map((o) => ({ id: o.id, text: o.textEn, isCorrect: o.isCorrect })) });
+      continue;
+    }
+    const own = correct[0].textEn;
+    const distractors = seededShuffle(correctTexts.filter((t) => t !== own), q.id).slice(0, 3);
+    if (distractors.length < 2) continue;
+    const opts = [{ id: `${q.id}#c`, text: own, isCorrect: true }, ...distractors.map((t, i) => ({ id: `${q.id}#d${i}`, text: t, isCorrect: false }))];
+    pool.push({ id: q.id, prompt: q.promptEn, options: seededShuffle(opts, q.id + "o") });
+  }
+  return pool;
+}
+
+/** Draws up to n distinct question ids. */
+export function drawCheckpoint(pool: PoolQuestion[], n = 2, rand: () => number = Math.random): string[] {
+  const ids = pool.map((q) => q.id);
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  return ids.slice(0, Math.min(n, ids.length));
+}
+
+/** A lesson is unlocked when it is the first one or the previous lesson is completed. */
+export function isLessonUnlocked(lessons: { id: string }[], completed: Set<string>, index: number): boolean {
+  return index <= 0 || completed.has(lessons[index - 1].id);
+}

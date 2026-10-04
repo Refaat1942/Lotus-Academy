@@ -13,12 +13,12 @@ export async function Logo({ light = false }: { light?: boolean }) {
         // Plain <img>: user-supplied formats (SVG/GIF/AVIF…) must not go through the image optimizer.
         <span className={light ? "rounded-xl bg-white px-3 py-2" : ""}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/brand/logo?v=${brand.logo}`} alt={t("brand.name")} className="h-10 w-auto max-w-[180px] object-contain" />
+          <img src={`/api/brand/logo?v=${brand.logo}`} alt={t("brand.name")} className="h-14 w-auto max-w-[260px] object-contain" />
         </span>
       ) : (
         <>
-          <Image src="/brand/lotus-mark.svg" alt="" width={42} height={42} priority unoptimized className={light ? "rounded-full bg-white p-0.5" : ""} />
-          <span className={`text-xl font-extrabold tracking-wide ${light ? "text-white" : "text-primary"}`}>LOTUS</span>
+          <Image src="/brand/lotus-mark.svg" alt="" width={52} height={52} priority unoptimized className={light ? "rounded-full bg-white p-0.5" : ""} />
+          <span className={`text-2xl font-extrabold tracking-wide ${light ? "text-white" : "text-primary"}`}>LOTUS</span>
         </>
       )}
       <span className={`hidden border-s ps-3 leading-tight sm:block ${light ? "border-white/30" : "border-border"}`}>

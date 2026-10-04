@@ -26,12 +26,27 @@
 [dir="rtl"] { --font-sans: "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, sans-serif; }
 
 html { -webkit-text-size-adjust: 100%; }
-body { @apply bg-background text-text font-sans antialiased; }
+body {
+  @apply bg-background text-text font-sans antialiased;
+  /* soft brand-tinted atmosphere behind every page */
+  background-image:
+    radial-gradient(60rem 40rem at 90% -10%, rgb(var(--primary-light) / .9), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 30%, rgb(var(--secondary) / .05), transparent 60%),
+    radial-gradient(46rem 30rem at 100% 85%, rgb(var(--primary) / .06), transparent 60%);
+  background-attachment: fixed;
+}
+main { animation: fade-up .5s ease-out both; }
+.reveal-hidden { opacity: 0; transform: translateY(22px); }
+.reveal-in { opacity: 1; transform: none; transition: opacity .7s ease-out, transform .7s cubic-bezier(.2,.7,.2,1); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .reveal-hidden { opacity: 1; transform: none; }
+}
 :focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; }
 
 @layer components {
   .btn { @apply inline-flex whitespace-nowrap items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply btn bg-primary text-white shadow-sm hover:bg-primary-dark; }
+  .btn-primary { @apply btn relative overflow-hidden bg-primary text-white shadow-sm hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-lift active:translate-y-0; transition: transform .15s, box-shadow .15s, background-color .15s; }
   .btn-white { @apply btn bg-white text-primary-dark hover:bg-primary-light; }
   .btn-outline-white { @apply btn border border-white/60 text-white hover:bg-white/10; }
   .btn-secondary { @apply btn border border-border bg-surface text-text hover:bg-primary-light; }

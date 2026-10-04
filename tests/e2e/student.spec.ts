@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, db, plantToken, resetRateLimits } from "./helpers";
+import { PASSWORD, answerCheckpoint, db, plantToken, resetRateLimits } from "./helpers";
 
 const email = `student-${Date.now()}@e2e.test`;
 
@@ -59,7 +59,11 @@ test.describe.serial("student journey", () => {
     await page.getByRole("button", { name: "Bookmark" }).click();
     await expect(page.getByRole("button", { name: "Bookmarked" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Mark as complete" }).click();
+    const lessons = await db.lesson.findMany({ where: { course: { slug: "diabetes-medications-in-egypt" } }, orderBy: { position: "asc" } });
+    // the next lesson is locked until the checkpoint is answered
+    await expect(page.getByRole("link", { name: "Next lesson" })).toHaveCount(0);
+    await answerCheckpoint(page, email, lessons[0].id);
+    await expect(page.getByText("Lesson completed")).toBeVisible();
     await expect(page.getByText("17%").first()).toBeVisible();
 
     // leave mid-course, then resume from dashboard
@@ -69,16 +73,17 @@ test.describe.serial("student journey", () => {
     await page.getByRole("link", { name: "Continue learning" }).click();
     await expect(page).toHaveURL(/lesson-02/);
 
-    for (let i = 0; i < 5; i++) {
-      await page.getByRole("button", { name: "Mark as complete" }).click();
-      await expect(page.getByText("Completed", { exact: true }).first()).toBeVisible();
+    for (let i = 1; i < 6; i++) {
+      await answerCheckpoint(page, email, lessons[i].id);
+      await expect(page.getByText("Lesson completed")).toBeVisible();
       const next = page.getByRole("link", { name: "Next lesson" });
-      if (await next.count()) await next.click();
+      if (await next.count()) { await next.click(); await expect(page).toHaveURL(new RegExp(lessons[i + 1].slug)); }
     }
     await expect(page.getByText("You completed this course!")).toBeVisible();
     await page.getByRole("link", { name: "View certificate" }).click();
     await expect(page.getByRole("heading", { name: "Certificate of Completion" })).toBeVisible();
-    await expect(page.getByText("Sara Ahmed")).toBeVisible();
+    await expect(page.locator(".cert-sheet").getByText("Sara Ahmed")).toBeVisible();
+    await expect(page.locator(".cert-sheet").getByText("Diabetes Medications in Egypt")).toBeVisible();
   });
 
   test("quiz: take, fail, retry and pass", async ({ page }) => {

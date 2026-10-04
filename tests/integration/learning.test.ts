@@ -1,9 +1,22 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
-import { completeLesson, enroll, submitQuiz, toggleBookmark, markLessonViewed } from "@/lib/learning";
+import { completeLesson, enroll, getCheckpoint, submitCheckpoint, submitQuiz, toggleBookmark, markLessonViewed } from "@/lib/learning";
+import { buildCheckpointPool } from "@/lib/domain";
 import { hashPassword } from "@/lib/auth-core";
 
 let userId: string, otherId: string, courseId: string;
+
+/** Completes a lesson the way a learner must: by answering its checkpoint correctly (or directly if none). */
+async function finishLesson(uid: string, lessonId: string) {
+  const cp = await getCheckpoint(uid, lessonId);
+  if (!cp.required || cp.passed) return completeLesson(uid, lessonId);
+  const qs = await db.quizQuestion.findMany({ where: { quiz: { lessonId } }, select: { id: true, promptEn: true, options: { select: { id: true, textEn: true, isCorrect: true } } } });
+  const pool = buildCheckpointPool(qs);
+  const answers = Object.fromEntries(cp.questions.map((q) => [q.id, pool.find((p) => p.id === q.id)!.options.filter((o) => o.isCorrect).map((o) => o.id)]));
+  const r = await submitCheckpoint(uid, lessonId, answers);
+  if (!r.passed) throw new Error("checkpoint unexpectedly failed");
+  return completeLesson(uid, lessonId);
+}
 
 beforeAll(async () => {
   const mk = async (email: string) => (await db.user.upsert({ where: { email }, update: {}, create: { email, firstName: "Test", lastName: "Learner", passwordHash: await hashPassword("Passw0rd!!x"), status: "ACTIVE" } })).id;
@@ -34,25 +47,38 @@ describe("progress and authorization of learning actions", () => {
     await expect(markLessonViewed(otherId, l.id)).rejects.toThrow(/Not enrolled/);
     await expect(toggleBookmark(otherId, l.id)).rejects.toThrow(/Not enrolled/);
   });
+  it("blocks manual completion while a checkpoint is required, and fails wrong answers with a fresh draw", async () => {
+    const l = (await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } }))[1];
+    await expect(completeLesson(userId, l.id)).rejects.toThrow(/Checkpoint required/);
+    const cp = await getCheckpoint(userId, l.id);
+    expect(cp.required).toBe(true);
+    expect(cp.questions.length).toBe(2);
+    expect(JSON.stringify(cp)).not.toContain("isCorrect"); // answers never leave the server
+    const wrong = Object.fromEntries(cp.questions.map((q) => [q.id, []]));
+    expect(await submitCheckpoint(userId, l.id, wrong)).toEqual({ passed: false });
+    await expect(completeLesson(userId, l.id)).rejects.toThrow(/Checkpoint required/);
+    const after = await getCheckpoint(userId, l.id);
+    expect(after.attempts).toBe(1);
+  });
   it("tracks progress server-side and resumes position", async () => {
     const lessons = await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } });
     await markLessonViewed(userId, lessons[2].id);
     expect((await db.enrollment.findFirstOrThrow({ where: { userId, courseId } })).lastLessonId).toBe(lessons[2].id);
-    const r = await completeLesson(userId, lessons[0].id);
+    const r = await finishLesson(userId, lessons[0].id);
     expect(r).toMatchObject({ done: 1, total: 6, percent: 17, complete: false });
-    expect(await completeLesson(userId, lessons[0].id)).toMatchObject({ done: 1 }); // idempotent
+    expect(await finishLesson(userId, lessons[0].id)).toMatchObject({ done: 1 }); // idempotent
   });
   it("completes the course and issues exactly one certificate with a non-guessable ID", async () => {
     const lessons = await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } });
     let last;
-    for (const l of lessons) last = await completeLesson(userId, l.id);
+    for (const l of lessons) last = await finishLesson(userId, l.id);
     expect(last!.complete).toBe(true);
     const e = await db.enrollment.findFirstOrThrow({ where: { userId, courseId } });
     expect(e.status).toBe("COMPLETED");
     const certs = await db.certificate.findMany({ where: { userId, courseId } });
     expect(certs).toHaveLength(1);
     expect(certs[0].publicId).toMatch(/^LA-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    await completeLesson(userId, lessons[0].id);
+    await finishLesson(userId, lessons[0].id);
     expect(await db.certificate.count({ where: { userId, courseId } })).toBe(1);
   });
 });
@@ -62,7 +88,7 @@ describe("quizzes", () => {
     const cv = (await db.course.findUniqueOrThrow({ where: { code: "EG-MED-01" } })).id;
     await enroll(userId, cv);
     const lessons = await db.lesson.findMany({ where: { courseId: cv }, orderBy: { position: "asc" } });
-    for (const l of lessons) await completeLesson(userId, l.id);
+    for (const l of lessons) await finishLesson(userId, l.id);
     expect((await db.enrollment.findFirstOrThrow({ where: { userId, courseId: cv } })).status).toBe("ACTIVE"); // quizzes outstanding
     const quizzes = await db.quiz.findMany({ where: { courseId: cv, status: "PUBLISHED" }, include: { questions: { include: { options: true } } } });
     expect(quizzes.length).toBe(8);

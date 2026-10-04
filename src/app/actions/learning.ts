@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { assertUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { completeLesson, enroll, submitQuiz, toggleBookmark } from "@/lib/learning";
+import { completeLesson, enroll, submitCheckpoint, submitQuiz, toggleBookmark } from "@/lib/learning";
 
 export async function enrollAction(fd: FormData) {
   const user = await assertUser();
@@ -37,4 +37,16 @@ export async function submitQuizAction(fd: FormData) {
   const res = await submitQuiz(user.id, quizId, answers);
   revalidatePath("/learn", "layout");
   redirect(`/quiz-result/${res.attemptId}`);
+}
+
+export async function submitCheckpointAction(fd: FormData) {
+  const user = await assertUser();
+  const lessonId = String(fd.get("lessonId") ?? "");
+  const back = String(fd.get("back") ?? "/dashboard");
+  const answers: Record<string, string[]> = {};
+  for (const [k, v] of fd.entries()) if (k.startsWith("q_")) (answers[k.slice(2)] ??= []).push(String(v));
+  const res = await submitCheckpoint(user.id, lessonId, answers);
+  revalidatePath("/learn", "layout");
+  revalidatePath("/dashboard");
+  redirect(`${/^\/learn\/[\w-]+\/[\w-]+$/.test(back) ? back : "/dashboard"}?cp=${res.passed ? "pass" : "fail"}#checkpoint`);
 }

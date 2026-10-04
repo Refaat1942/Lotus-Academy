@@ -6,7 +6,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { listCourses, progressFor } from "@/lib/catalog";
 import { CourseCard } from "@/components/CourseCard";
 import { categoryIcon } from "@/components/icons";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, SectionHead } from "@/components/ui";
+import { Reveal } from "@/components/Reveal";
+import { themeVars } from "@/lib/category-theme";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +46,9 @@ export default async function Home() {
   return (
     <>
       <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary-dark text-white shadow-lift">
-          <div className="pointer-events-none absolute -end-20 -top-10 hidden h-[28rem] w-[28rem] opacity-90 md:block"><Petals /></div>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-[#00894a] to-primary-dark bg-[length:200%_200%] text-white shadow-lift animate-gradient">
+          <div className="pointer-events-none absolute -end-20 -top-10 hidden h-[28rem] w-[28rem] animate-float opacity-90 md:block"><Petals /></div>
+          <span className="pointer-events-none absolute -bottom-24 start-1/3 h-72 w-72 rounded-full bg-white/5 blur-2xl" aria-hidden />
           <div className="relative grid gap-10 px-6 py-14 sm:px-12 sm:py-20 lg:max-w-[62%]">
             <div>
               <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold uppercase tracking-widest">
@@ -74,30 +77,30 @@ export default async function Home() {
         </dl>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
-        <h2 className="mb-8 text-2xl font-extrabold text-primary-dark">{t("home.categories")}</h2>
+      <Reveal><section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
+        <SectionHead eyebrow={t("nav.categories")} title={t("home.categories")} />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
           {categories.map((c) => {
             const Icon = categoryIcon(c.slug);
             return (
-              <Link key={c.id} href={`/courses?category=${c.slug}`} className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-5 text-center transition-all hover:-translate-y-1 hover:border-primary hover:shadow-lift">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light text-primary transition-colors group-hover:bg-primary group-hover:text-white"><Icon size={28} aria-hidden /></span>
+              <Link key={c.id} href={`/courses?category=${c.slug}`} style={themeVars(c.slug)} className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-5 text-center transition-all duration-300 hover:-translate-y-1.5 hover:border-[var(--accent)] hover:shadow-lift">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--soft)] text-[var(--accent)] transition-all duration-300 group-hover:scale-110 group-hover:bg-[var(--accent)] group-hover:text-white"><Icon size={28} aria-hidden /></span>
                 <span className="text-sm font-bold leading-tight">{pick(locale, c.nameEn, c.nameAr)}</span>
                 <span className="text-xs text-muted">{c._count.courses} {t("nav.courses")}</span>
               </Link>
             );
           })}
         </div>
-      </section>
+      </section></Reveal>
 
-      <section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
-        <div className="mb-8 flex items-end justify-between"><h2 className="text-2xl font-extrabold text-primary-dark">{t("home.featured")}</h2><Link href="/courses" className="inline-flex items-center gap-1 text-sm font-bold text-primary">{t("nav.courses")} <ArrowRight size={16} className="rtl:-scale-x-100" aria-hidden /></Link></div>
+      <Reveal><section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
+        <SectionHead eyebrow={t("nav.courses")} title={t("home.featured")} action={<Link href="/courses" className="inline-flex items-center gap-1 text-sm font-bold text-primary underline-offset-4 hover:underline">{t("nav.courses")} <ArrowRight size={16} className="rtl:-scale-x-100" aria-hidden /></Link>} />
         {items.length ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{items.map((c) => <CourseCard key={c.id} c={c} locale={locale} t={t} progress={prog.get(c.id)} />)}</div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{items.map((c, i) => <CourseCard key={c.id} c={c} locale={locale} t={t} progress={prog.get(c.id)} index={i} />)}</div>
         ) : <EmptyState title={t("courses.empty")} />}
-      </section>
+      </section></Reveal>
 
-      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
+      <Reveal><section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
         <div className="rounded-3xl bg-primary-light px-6 py-14 sm:px-12">
           <h2 className="mb-10 text-center text-2xl font-extrabold text-primary-dark">{t("home.why")}</h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,30 +113,30 @@ export default async function Home() {
             ))}
           </div>
         </div>
-      </section>
+      </section></Reveal>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 pt-20 sm:px-6 md:grid-cols-2">
+      <Reveal><section className="mx-auto grid max-w-7xl gap-6 px-4 pt-20 sm:px-6 md:grid-cols-2">
         <div className="card p-8"><h2 className="text-xl font-extrabold text-primary-dark">{t("home.paths")}</h2><p className="mt-2 text-muted">{t("home.paths.d")}</p></div>
         <div className="card p-8"><h2 className="text-xl font-extrabold text-primary-dark">{t("home.testimonials")}</h2><p className="mt-2 text-muted">{t("home.testimonials.d")}</p></div>
-      </section>
+      </section></Reveal>
 
-      <section className="mx-auto max-w-3xl px-4 pt-20 sm:px-6">
+      <Reveal><section className="mx-auto max-w-3xl px-4 pt-20 sm:px-6">
         <h2 className="mb-6 text-2xl font-extrabold text-primary-dark">{t("home.faq")}</h2>
         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
           {faqs.map(([q, a]) => (
             <details key={q} className="group p-5"><summary className="cursor-pointer font-semibold marker:text-primary">{q}</summary><p className="mt-2 text-sm leading-6 text-muted">{a}</p></details>
           ))}
         </div>
-      </section>
+      </section></Reveal>
 
-      <section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
+      <Reveal><section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary-dark px-8 py-16 text-center text-white">
           <div className="pointer-events-none absolute -start-16 -bottom-24 h-72 w-72 opacity-60"><Petals /></div>
           <h2 className="relative text-3xl font-extrabold">{t("home.final.t")}</h2>
           <p className="relative mx-auto mt-3 max-w-xl text-white/85">{t("home.final.d")}</p>
           <Link href={user ? "/courses" : "/register"} className="btn-white relative mt-8">{user ? t("home.cta1") : t("home.cta2")}</Link>
         </div>
-      </section>
+      </section></Reveal>
     </>
   );
 }

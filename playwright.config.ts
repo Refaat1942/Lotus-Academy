@@ -18,6 +18,6 @@ export default defineConfig({
     command: `npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
-    env: { DATABASE_URL: DB, APP_URL: `http://localhost:${PORT}`, NODE_ENV: "production" },
+    env: { DATABASE_URL: DB, APP_URL: `http://localhost:${PORT}`, NODE_ENV: "production", ANTHROPIC_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "" },
   },
 });

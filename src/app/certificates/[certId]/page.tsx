@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { db } from "@/lib/db";
 import { getT } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { getBrand } from "@/lib/brand";
 import { PrintButton } from "@/components/PrintButton";
+import { CertificateView } from "@/components/CertificateView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Certificate", robots: { index: false } };
@@ -14,32 +14,26 @@ export default async function CertificatePage({ params }: { params: Promise<{ ce
   const { certId } = await params;
   const { t } = await getT();
   const user = await requireUser();
-  const cert = await db.certificate.findFirst({ where: { publicId: certId, userId: user.id }, include: { course: true } }); // owner-only
+  const cert = await db.certificate.findFirst({
+    where: { publicId: certId, userId: user.id }, // owner-only
+    include: { course: { include: { category: true, lessons: { where: { status: "PUBLISHED", deletedAt: null }, orderBy: { position: "asc" }, select: { titleEn: true } } } } },
+  });
   if (!cert) notFound();
-  const issuer = await db.systemSetting.findUnique({ where: { key: "certificate.issuer" } });
-  const issuerName = (issuer?.value as { en?: string } | null)?.en ?? "Lotus Academy";
-  const brand = await getBrand();
-  const url = `${env.appUrl()}/verify/certificate/${cert.publicId}`;
+  const [issuer, brand] = await Promise.all([db.systemSetting.findUnique({ where: { key: "certificate.issuer" } }), getBrand()]);
+  const c = cert.course;
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <div className="mb-4 flex justify-end print:hidden"><PrintButton label={t("cert.print")} /></div>
-      <div className="relative border-[10px] border-double border-primary bg-surface p-10 text-center shadow-card sm:p-16" dir="ltr">
-        {brand.logo
-          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/api/brand/logo?v=${brand.logo}`} alt="" className="mx-auto h-16 w-auto" />
-          : <Image src="/brand/lotus-mark.svg" alt="" width={64} height={64} className="mx-auto" unoptimized />}
-        <p className="mt-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-dark">LOTUS ACADEMY</p>
-        <h1 className="mt-8 font-serif text-4xl text-primary-dark">{t("cert.title")}</h1>
-        <p className="mt-8 text-muted">{t("cert.certify")}</p>
-        <p className="mt-3 font-serif text-4xl">{cert.recipientName}</p>
-        <p className="mt-6 text-muted">{t("cert.completed")}</p>
-        <p className="mt-3 text-2xl font-semibold text-primary-dark">{cert.courseTitle}</p>
-        <div className="mt-10 grid gap-4 text-sm sm:grid-cols-3">
-          <div><div className="text-muted">{t("cert.issued")}</div><div className="font-medium">{cert.issuedAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</div></div>
-          <div><div className="text-muted">{t("cert.issuer")}</div><div className="font-medium">{issuerName}</div></div>
-          <div><div className="text-muted">{t("cert.id")}</div><div className="font-mono font-medium">{cert.publicId}</div></div>
-        </div>
-        <p className="mt-8 break-all text-xs text-muted">{t("cert.verify")}: {url}</p>
+    <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 print:p-0">
+      <style>{`@media print { @page { size: A4 landscape; margin: 0 } body { background: white } .cert-sheet { width: 297mm; height: 210mm; aspect-ratio: auto } }`}</style>
+      <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
+        <p className="text-sm text-muted">{t("cert.certify")} <strong className="text-text">{cert.recipientName}</strong></p>
+        <PrintButton label={t("cert.print")} />
       </div>
+      <CertificateView c={{
+        publicId: cert.publicId, recipientName: cert.recipientName, courseTitle: cert.courseTitle, courseTitleAr: c.titleAr, courseCode: c.code,
+        categorySlug: c.category?.slug, categoryName: c.category?.nameEn, issuedAt: cert.issuedAt, durationMinutes: c.durationMinutes, lessonCount: c.lessons.length,
+        topics: c.lessons.slice(0, 8).map((l) => l.titleEn.replace(/\s[—-]\s.*$/, "")), issuerName: (issuer?.value as { en?: string } | null)?.en ?? "Lotus Academy",
+        verifyUrl: `${env.appUrl()}/verify/certificate/${cert.publicId}`, logoSrc: brand.logo ? `/api/brand/logo?v=${brand.logo}` : null,
+      }} />
     </div>
   );
 }

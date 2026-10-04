@@ -3,8 +3,8 @@ import Link from "next/link";
 export function Progress({ value, label }: { value: number; label?: string }) {
   const v = Math.max(0, Math.min(100, value));
   return (
-    <div role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? "Progress"} className="h-2 w-full overflow-hidden rounded-full bg-primary-light">
-      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${v}%` }} />
+    <div role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? "Progress"} className="h-2 w-full overflow-hidden rounded-full bg-[var(--soft,rgb(var(--primary-light)))]">
+      <div className="h-full rounded-full bg-gradient-to-r from-[var(--accent,rgb(var(--primary)))] to-[var(--accent-dark,rgb(var(--primary-dark)))] transition-[width] duration-700 ease-out" style={{ width: `${v}%` }} />
     </div>
   );
 }
@@ -72,4 +72,17 @@ export function fmtDuration(min: number, t: (k: "common.hours" | "common.minutes
     return `${h}${t("common.hours")}${m ? ` ${m}${t("common.minutes")}` : ""}`;
   }
   return `${min}${t("common.minutes")}`;
+}
+
+/** Editorial section heading: small eyebrow, large title, thin brand rule, optional link. */
+export function SectionHead({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-8 flex items-end justify-between gap-4 border-b border-border pb-4">
+      <div>
+        {eyebrow && <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-secondary">{eyebrow}</p>}
+        <h2 className="relative text-2xl font-extrabold tracking-tight text-primary-dark sm:text-3xl after:absolute after:-bottom-[17px] after:start-0 after:h-[3px] after:w-16 after:bg-primary">{title}</h2>
+      </div>
+      {action}
+    </div>
+  );
 }

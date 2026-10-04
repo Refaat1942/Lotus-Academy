@@ -88,6 +88,8 @@ model User {
   lessonProgress   LessonProgress[]
   courseProgress   CourseProgress[]
   bookmarks        Bookmark[]
+  checkpoints      LessonCheckpoint[]
+  chatMessages     ChatMessage[]
   quizAttempts     QuizAttempt[]
   certificates     Certificate[]
   notifications    Notification[]
@@ -226,6 +228,7 @@ model Course {
   language         String?
   sortOrder        Int           @default(0)
   categoryId       String?
+  sequential       Boolean       @default(true) // lessons unlock one after another
   priceCents       Int           @default(0) // extension point: paid courses
   currency         String        @default("EGP")
   publishedAt      DateTime?
@@ -266,6 +269,8 @@ model CourseModule {
   courseId  String
   titleEn   String
   titleAr   String?
+  descriptionEn String?
+  descriptionAr String?
   position  Int
   status    ContentStatus @default(PUBLISHED)
   createdAt DateTime      @default(now())
@@ -290,6 +295,7 @@ model Lesson {
   position        Int
   status          ContentStatus @default(PUBLISHED)
   isPreview       Boolean       @default(false)
+  requireCheckpoint Boolean     @default(true) // learner must answer a check-your-understanding question to move on
   searchText      String        @default("")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -306,16 +312,24 @@ model Lesson {
   progress LessonProgress[]
   bookmarks Bookmark[]
   quizzes  Quiz[]
+  checkpoints LessonCheckpoint[]
 
   @@unique([courseId, slug])
   @@index([moduleId, position])
 }
 
+enum AssetKind {
+  FILE
+  LINK
+}
+
 model LessonAsset {
   id        String   @id @default(cuid())
   lessonId  String
+  kind      AssetKind @default(LINK)
   name      String
-  url       String
+  url       String   @default("")   // external link, or empty when fileId is set
+  fileId    String?
   mimeType  String?
   sizeBytes Int?
   createdAt DateTime @default(now())
@@ -560,4 +574,40 @@ model BrandAsset {
   sizeBytes Int
   fileName  String?
   updatedAt DateTime @updatedAt
+}
+
+/** Per-learner "check your understanding" state for a lesson: which questions are currently drawn. */
+model LessonCheckpoint {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  questionIds String[]  @default([])
+  attempts    Int       @default(0)
+  passedAt    DateTime?
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  @@unique([userId, lessonId])
+}
+
+/** Uploaded learning materials (PDF/Office/images). Served only to enrolled learners and staff. */
+model StoredFile {
+  id        String   @id @default(cuid())
+  name      String
+  mime      String
+  data      Bytes
+  sizeBytes Int
+  createdAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  lessonId  String?
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, courseId, createdAt])
 }

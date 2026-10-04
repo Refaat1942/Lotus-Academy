@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { AdminTitle } from "@/components/admin";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmAction } from "@/components/ConfirmAction";
-import { addVideoAction, deleteVideoAction, updateLessonAction } from "@/app/actions/admin";
+import { addMaterialLinkAction, addVideoAction, deleteMaterialAction, deleteVideoAction, updateLessonAction, uploadMaterialAction } from "@/app/actions/admin";
 import { renderMarkdown } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function EditLesson({ params }: { params: Promise<{ id: string; lessonId: string }> }) {
   const me = await requirePermission("courses.read");
   const { id, lessonId } = await params;
-  const l = await db.lesson.findFirst({ where: { id: lessonId, courseId: id }, include: { videos: true, course: true } });
+  const l = await db.lesson.findFirst({ where: { id: lessonId, courseId: id }, include: { videos: true, assets: true, course: true } });
   if (!l) notFound();
   const can = me.permissions.has("lessons.write");
   return (
@@ -31,6 +31,7 @@ export default async function EditLesson({ params }: { params: Promise<{ id: str
                 <div><label className="label" htmlFor="status">Status</label><select id="status" name="status" defaultValue={l.status} className="input"><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
               </div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isPreview" defaultChecked={l.isPreview} /> Free preview lesson</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="requireCheckpoint" defaultChecked={l.requireCheckpoint} /> Require a “check your understanding” question before the learner can continue</label>
               <div><label className="label" htmlFor="objectives">Learning objectives (one per line)</label><textarea id="objectives" name="objectives" rows={4} defaultValue={l.objectives.join("\n")} className="input" /></div>
               <div><label className="label" htmlFor="bodyMd">Content (Markdown)</label><textarea id="bodyMd" name="bodyMd" rows={22} defaultValue={l.bodyMd} className="input font-mono text-xs" /></div>
             </ActionForm>
@@ -45,6 +46,18 @@ export default async function EditLesson({ params }: { params: Promise<{ id: str
               <div><label className="label" htmlFor="externalId">External ID (YouTube/Vimeo)</label><input id="externalId" name="externalId" className="input" /></div>
               <div><label className="label" htmlFor="url">URL (https)</label><input id="url" name="url" type="url" required className="input" /></div>
             </ActionForm>}
+          </section>
+          <section className="card p-5"><h2 className="mb-1 font-semibold">Educational materials</h2>
+            <p className="mb-3 text-sm text-muted">Attach PDFs, Word/PowerPoint/Excel files, images (up to 15 MB) or external links. Files are only available to enrolled learners.</p>
+            <ul className="mb-4 space-y-2 text-sm">{l.assets.map((a) => <li key={a.id} className="flex items-center justify-between gap-2"><span className="min-w-0 truncate">{a.kind === "FILE" ? "📎" : "🔗"} {a.name}{a.sizeBytes ? ` · ${Math.round(a.sizeBytes / 1024)} KB` : ""}</span>{can && <ConfirmAction action={deleteMaterialAction} fields={{ id: a.id }} label="Delete" message="Remove this material?" danger />}</li>)}{!l.assets.length && <li className="text-muted">No materials yet</li>}</ul>
+            {can && (<div className="space-y-5 border-t border-border pt-4">
+              <ActionForm action={uploadMaterialAction} submitLabel="Upload file" buttonClass="btn-secondary"><input type="hidden" name="lessonId" value={l.id} />
+                <div><label className="label" htmlFor="mfile">File</label><input id="mfile" name="file" type="file" required accept=".pdf,.docx,.pptx,.xlsx,image/*" className="input" /></div>
+                <div><label className="label" htmlFor="mname">Title (optional)</label><input id="mname" name="name" maxLength={150} className="input" /></div></ActionForm>
+              <ActionForm action={addMaterialLinkAction} submitLabel="Add link" buttonClass="btn-secondary"><input type="hidden" name="lessonId" value={l.id} />
+                <div><label className="label" htmlFor="lname">Link title</label><input id="lname" name="name" required maxLength={150} className="input" /></div>
+                <div><label className="label" htmlFor="lurl">URL (https)</label><input id="lurl" name="url" type="url" required className="input" /></div></ActionForm>
+            </div>)}
           </section>
           <section className="card p-5"><h2 className="mb-3 font-semibold">Preview</h2><div className="prose-lotus max-h-[28rem] overflow-y-auto text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(l.bodyMd) }} /></section>
         </div>

@@ -29,3 +29,20 @@ export async function ensureUser(email: string, role: string, status: "ACTIVE" |
 export async function resetRateLimits() {
   await db.rateLimit.deleteMany({});
 }
+
+import { buildCheckpointPool } from "../../src/lib/domain";
+import type { Page } from "@playwright/test";
+
+/** Answers the lesson's current checkpoint correctly (or wrongly) by recomputing the pool from the DB. */
+export async function answerCheckpoint(page: Page, userEmail: string, lessonId: string, correct = true) {
+  await page.locator("#checkpoint").waitFor();
+  const user = await db.user.findUniqueOrThrow({ where: { email: userEmail } });
+  const row = await db.lessonCheckpoint.findUniqueOrThrow({ where: { userId_lessonId: { userId: user.id, lessonId } } });
+  const qs = await db.quizQuestion.findMany({ where: { quiz: { lessonId } }, orderBy: { position: "asc" }, select: { id: true, promptEn: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, isCorrect: true } } } });
+  const pool = buildCheckpointPool(qs).filter((q) => row.questionIds.includes(q.id));
+  for (const q of pool) {
+    const picks = q.options.filter((o) => (correct ? o.isCorrect : !o.isCorrect)).slice(0, correct ? 9 : 1);
+    for (const o of picks) await page.locator(`input[name="q_${q.id}"][value="${o.id}"]`).check();
+  }
+  await page.getByRole("button", { name: /Submit answer/ }).click();
+}

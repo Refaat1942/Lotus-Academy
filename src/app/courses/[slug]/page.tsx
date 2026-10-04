@@ -10,6 +10,10 @@ import { Badge, Progress, fmtDuration } from "@/components/ui";
 import { CourseCard } from "@/components/CourseCard";
 import { listCourses } from "@/lib/catalog";
 import { resumeLesson } from "@/lib/domain";
+import { themeVars } from "@/lib/category-theme";
+import { categoryIcon } from "@/components/icons";
+import { Reveal } from "@/components/Reveal";
+import { CheckCircle2, ClipboardList, Lock, Paperclip, PlayCircle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +23,7 @@ async function load(slug: string) {
     include: {
       category: true,
       instructors: { include: { instructor: { include: { user: true } } } },
-      modules: { orderBy: { position: "asc" }, include: { lessons: { where: { status: "PUBLISHED", deletedAt: null }, orderBy: { position: "asc" }, select: { id: true, slug: true, titleEn: true, titleAr: true, durationMinutes: true, isPreview: true } } } },
+      modules: { orderBy: { position: "asc" }, include: { lessons: { where: { status: "PUBLISHED", deletedAt: null }, orderBy: { position: "asc" }, select: { id: true, slug: true, titleEn: true, titleAr: true, durationMinutes: true, isPreview: true, _count: { select: { videos: true, assets: true, quizzes: true } } } } } },
     },
   });
 }
@@ -48,11 +52,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const resume = lessons.find((l) => l.id === resumeId);
   const objectives = locale === "ar" && course.objectivesAr.length ? course.objectivesAr : course.objectivesEn;
   const title = pick(locale, course.titleEn, course.titleAr);
+  const Icon = categoryIcon(course.category?.slug);
   const strip = (s: string) => s.replace(/\*\*/g, "");
 
   return (
-    <>
-      <section className="bg-gradient-to-br from-primary to-primary-dark text-white">
+    <div style={themeVars(course.category?.slug)}>
+      <section className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-dark))" }}>
+        <Icon size={360} strokeWidth={0.7} className="pointer-events-none absolute -end-16 -top-10 animate-float text-white/10" aria-hidden />
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <nav aria-label="Breadcrumb" className="mb-4 text-sm text-white/70"><Link href="/courses" className="hover:text-white">{t("nav.courses")}</Link> / {course.category && pick(locale, course.category.nameEn, course.category.nameAr)}</nav>
@@ -85,21 +91,43 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         <div className="space-y-12 lg:col-span-2">
           {course.descriptionEn && <section><p dir="auto" className="text-lg leading-8 text-text/90">{pick(locale, course.descriptionEn, course.descriptionAr)}</p></section>}
           {objectives.length > 0 && (
-            <section><h2 className="mb-4 text-xl font-semibold text-primary-dark">{t("courses.objectives")}</h2>
-              <ul className="grid gap-3 sm:grid-cols-2">{objectives.map((o) => <li key={o} dir="auto" className="card p-4 text-sm">{strip(o)}</li>)}</ul></section>
+            <section><h2 className="mb-4 text-xl font-extrabold" style={{ color: "var(--accent-dark)" }}>{t("courses.objectives")}</h2>
+              <ul className="grid gap-3 sm:grid-cols-2">{objectives.map((o) => <li key={o} dir="auto" className="card border-s-4 p-4 text-sm" style={{ borderInlineStartColor: "var(--accent)" }}>{strip(o)}</li>)}</ul></section>
           )}
-          <section><h2 className="mb-4 text-xl font-semibold text-primary-dark">{t("courses.curriculum")}</h2>
-            {course.modules.map((m) => (
-              <div key={m.id} className="card divide-y divide-border">
-                {m.lessons.map((l, i) => (
-                  <div key={l.id} className="flex items-center gap-4 p-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary-dark">{doneSet.has(l.id) ? "✓" : i + 1}</span>
-                    <div className="flex-1"><div className="font-medium">{pick(locale, l.titleEn, l.titleAr)}</div><div className="text-xs text-muted">{fmtDuration(l.durationMinutes, t)}</div></div>
-                    {l.isPreview && !enrolled && <Badge tone="primary">{t("courses.preview")}</Badge>}
-                  </div>
-                ))}
-              </div>
-            ))}
+          <section><h2 className="mb-6 text-xl font-extrabold" style={{ color: "var(--accent-dark)" }}>{t("courses.curriculum")}</h2>
+            <ol className="relative space-y-8 border-s-2 ps-8" style={{ borderColor: "var(--soft)" }}>
+              {(() => { let n = 0; return course.modules.filter((m) => m.lessons.length).map((m, mi) => (
+                <li key={m.id} className="relative">
+                  <span className="absolute -start-[49px] top-0 flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-card ring-4 ring-background" style={{ background: "var(--accent)" }}>{mi + 1}</span>
+                  <Reveal>
+                    <div className="card overflow-hidden">
+                      <div className="px-5 py-4" style={{ background: "var(--soft)" }}>
+                        <h3 className="font-bold" style={{ color: "var(--accent-dark)" }}>{pick(locale, m.titleEn, m.titleAr)}</h3>
+                        {(m.descriptionEn || m.descriptionAr) && <p className="mt-1 text-sm text-muted">{pick(locale, m.descriptionEn, m.descriptionAr)}</p>}
+                      </div>
+                      <ol className="divide-y divide-border">
+                        {m.lessons.map((l) => {
+                          const i = n++; const isDone = doneSet.has(l.id);
+                          const locked = course.sequential && enrolled && i > 0 && !doneSet.has(lessons[i - 1].id);
+                          return (
+                            <li key={l.id} className="flex items-center gap-4 p-4">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold" style={isDone ? { background: "var(--accent)", color: "white" } : { background: "var(--soft)", color: "var(--accent-dark)" }}>{isDone ? <CheckCircle2 size={16} aria-hidden /> : locked ? <Lock size={14} aria-hidden /> : i + 1}</span>
+                              <div className="min-w-0 flex-1"><div className="font-medium">{pick(locale, l.titleEn, l.titleAr)}</div><div className="text-xs text-muted">{fmtDuration(l.durationMinutes, t)}</div></div>
+                              <div className="flex items-center gap-2 text-muted">
+                                {l._count.videos > 0 && <PlayCircle size={16} aria-label="Video" />}
+                                {l._count.assets > 0 && <Paperclip size={16} aria-label="Materials" />}
+                                {l._count.quizzes > 0 && <ClipboardList size={16} aria-label="Quiz" />}
+                              </div>
+                              {l.isPreview && !enrolled && <Badge tone="primary">{t("courses.preview")}</Badge>}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  </Reveal>
+                </li>
+              )); })()}
+            </ol>
           </section>
         </div>
         <aside className="space-y-8">
@@ -113,6 +141,6 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6"><h2 className="mb-6 text-xl font-semibold text-primary-dark">{t("courses.related")}</h2>
           <div className="grid gap-6 md:grid-cols-3">{related.items.filter((c) => c.id !== course.id).slice(0, 3).map((c) => <CourseCard key={c.id} c={c} locale={locale} t={t} />)}</div></section>
       )}
-    </>
+    </div>
   );
 }
