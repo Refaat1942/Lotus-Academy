@@ -9,6 +9,7 @@ import { categoryIcon } from "@/components/icons";
 import { EmptyState, SectionHead } from "@/components/ui";
 import { Reveal } from "@/components/Reveal";
 import { themeVars } from "@/lib/category-theme";
+import { getBrand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ function Petals() {
 export default async function Home() {
   const { t, locale } = await getT();
   const user = await getCurrentUser();
+  const brand = await getBrand();
   const [featured, categories, courseCount, lessonCount, questionCount] = await Promise.all([
     listCourses({ sort: "popular" }),
     db.courseCategory.findMany({ orderBy: { sortOrder: "asc" }, include: { _count: { select: { courses: { where: { status: "PUBLISHED" } } } } } }),
@@ -47,7 +49,16 @@ export default async function Home() {
     <>
       <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-[#00894a] to-primary-dark bg-[length:200%_200%] text-white shadow-lift animate-gradient">
-          <div className="pointer-events-none absolute -end-20 -top-10 hidden h-[28rem] w-[28rem] animate-float opacity-90 md:block"><Petals /></div>
+          {brand.logo ? (
+            <div className="absolute end-10 top-[46%] hidden -translate-y-1/2 animate-float md:block lg:end-20" aria-hidden>
+              <div className="flex h-52 w-52 items-center justify-center rounded-[2.25rem] bg-white p-7 shadow-lift ring-8 ring-white/20 lg:h-64 lg:w-64">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/brand/logo?v=${brand.logo}`} alt="" className="max-h-full max-w-full object-contain" />
+              </div>
+            </div>
+          ) : (
+            <div className="pointer-events-none absolute -end-20 -top-10 hidden h-[28rem] w-[28rem] animate-float opacity-90 md:block"><Petals /></div>
+          )}
           <span className="pointer-events-none absolute -bottom-24 start-1/3 h-72 w-72 rounded-full bg-white/5 blur-2xl" aria-hidden />
           <div className="relative grid gap-10 px-6 py-14 sm:px-12 sm:py-20 lg:max-w-[62%]">
             <div>
