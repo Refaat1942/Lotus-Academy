@@ -27,6 +27,7 @@ export async function Header() {
             <>
               {isStaff(user) && <Link href="/admin" className="btn-secondary hidden sm:inline-flex">{t("nav.admin")}</Link>}
               <Link href="/dashboard" className="btn-primary hidden sm:inline-flex">{t("nav.dashboard")}</Link>
+              <Link href="/profile" className="btn-secondary hidden sm:inline-flex">{t("profile.title")}</Link>
               <form action={logoutAction} className="hidden sm:block"><button className="btn-secondary" type="submit">{t("nav.logout")}</button></form>
             </>
           ) : (
