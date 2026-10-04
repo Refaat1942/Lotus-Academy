@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { assertPermission } from "@/lib/auth";
+import { assertPermission, type CurrentUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { ContentStatus, CourseLevel } from "@prisma/client";
@@ -10,6 +10,14 @@ import { sendMail } from "@/lib/mail";
 
 type State = { error?: string; ok?: string } | null;
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+
+/** Instructors may only touch courses they are assigned to; admins/content managers may touch all. */
+async function assertCourseAccess(user: CurrentUser, courseId: string) {
+  if (["SUPER_ADMIN", "ADMIN", "CONTENT_MANAGER"].some((r) => user.roles.includes(r))) return;
+  const link = await db.courseInstructor.findUnique({ where: { courseId_instructorId: { courseId, instructorId: user.id } } });
+  if (!link) throw new Error("Forbidden");
+}
+const isManager = (u: CurrentUser) => ["SUPER_ADMIN", "ADMIN", "CONTENT_MANAGER"].some((r) => u.roles.includes(r));
 const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 
 // ---------- Courses ----------
@@ -27,7 +35,7 @@ const courseSchema = z.object({
   level: z.nativeEnum(CourseLevel),
   durationMinutes: z.coerce.number().int().min(0).max(100000),
   passMark: z.coerce.number().int().min(0).max(100),
-  thumbnailUrl: z.string().trim().max(500).refine((v) => !v || /^(https:\/\/|\/)/.test(v), "Thumbnail must be an https URL or a /path").optional(),
+  thumbnailUrl: z.string().trim().max(500).refine((v) => !v || /^(https:\/\/|\/(?![\/\\]))/.test(v), "Thumbnail must be an https URL or a /path").optional(),
 });
 
 export async function createCourseAction(_: State, fd: FormData): Promise<State> {
@@ -44,6 +52,7 @@ export async function createCourseAction(_: State, fd: FormData): Promise<State>
 export async function updateCourseAction(_: State, fd: FormData): Promise<State> {
   const user = await assertPermission("courses.write");
   const id = String(fd.get("id"));
+  await assertCourseAccess(user, id);
   const p = courseSchema.safeParse(Object.fromEntries(fd));
   if (!p.success) return { error: p.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const d = p.data;
@@ -65,6 +74,7 @@ export async function setCourseStatusAction(fd: FormData) {
   const id = String(fd.get("id"));
   const status = z.nativeEnum(ContentStatus).parse(fd.get("status"));
   const user = await assertPermission(status === "PUBLISHED" || status === "ARCHIVED" ? "courses.publish" : "courses.write");
+  await assertCourseAccess(user, id);
   await db.course.update({ where: { id }, data: { status, publishedAt: status === "PUBLISHED" ? new Date() : undefined } });
   await audit(user.id, `course.${status.toLowerCase()}`, "Course", id);
   revalidatePath("/admin/courses");
@@ -73,6 +83,7 @@ export async function setCourseStatusAction(fd: FormData) {
 
 export async function assignInstructorAction(_: State, fd: FormData): Promise<State> {
   const user = await assertPermission("courses.write");
+  if (!isManager(user)) throw new Error("Forbidden");
   const courseId = String(fd.get("courseId"));
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   const u = await db.user.findUnique({ where: { email }, include: { roles: { include: { role: true } } } });
@@ -86,6 +97,7 @@ export async function assignInstructorAction(_: State, fd: FormData): Promise<St
 
 export async function removeInstructorAction(fd: FormData) {
   const user = await assertPermission("courses.write");
+  if (!isManager(user)) throw new Error("Forbidden");
   const courseId = String(fd.get("courseId"));
   await db.courseInstructor.delete({ where: { courseId_instructorId: { courseId, instructorId: String(fd.get("instructorId")) } } });
   await audit(user.id, "course.remove_instructor", "Course", courseId);
@@ -110,6 +122,7 @@ export async function updateLessonAction(_: State, fd: FormData): Promise<State>
   if (!p.success) return { error: p.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const d = p.data;
   if (d.status === "PUBLISHED") await assertPermission("courses.publish");
+  await assertCourseAccess(user, (await db.lesson.findUniqueOrThrow({ where: { id } })).courseId);
   const lesson = await db.lesson.update({
     where: { id },
     data: { titleEn: d.titleEn, titleAr: d.titleAr || null, bodyMd: d.bodyMd, durationMinutes: d.durationMinutes, objectives: lines(d.objectives ?? ""), status: d.status, isPreview: d.isPreview === "on", searchText: `${d.titleEn} ${d.bodyMd}`.slice(0, 20000) },
@@ -122,6 +135,7 @@ export async function updateLessonAction(_: State, fd: FormData): Promise<State>
 export async function createLessonAction(fd: FormData) {
   const user = await assertPermission("lessons.write");
   const courseId = String(fd.get("courseId"));
+  await assertCourseAccess(user, courseId);
   const mod = await db.courseModule.findFirstOrThrow({ where: { courseId }, orderBy: { position: "asc" } });
   const last = await db.lesson.findFirst({ where: { courseId }, orderBy: { position: "desc" } });
   const position = (last?.position ?? 0) + 1;
@@ -136,6 +150,7 @@ export async function moveLessonAction(fd: FormData) {
   const id = String(fd.get("id"));
   const dir = fd.get("dir") === "up" ? -1 : 1;
   const l = await db.lesson.findUniqueOrThrow({ where: { id } });
+  await assertCourseAccess(user, l.courseId);
   const other = await db.lesson.findFirst({ where: { courseId: l.courseId, deletedAt: null, position: dir === -1 ? { lt: l.position } : { gt: l.position } }, orderBy: { position: dir === -1 ? "desc" : "asc" } });
   if (!other) return;
   await db.$transaction([
@@ -149,7 +164,9 @@ export async function moveLessonAction(fd: FormData) {
 
 export async function archiveLessonAction(fd: FormData) {
   const user = await assertPermission("lessons.write");
-  const l = await db.lesson.update({ where: { id: String(fd.get("id")) }, data: { status: "ARCHIVED", deletedAt: new Date() } });
+  const target = await db.lesson.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+  await assertCourseAccess(user, target.courseId);
+  const l = await db.lesson.update({ where: { id: target.id }, data: { status: "ARCHIVED", deletedAt: new Date() } });
   await audit(user.id, "lesson.archive", "Lesson", l.id);
   revalidatePath(`/admin/courses/${l.courseId}`);
 }
@@ -165,6 +182,7 @@ export async function addVideoAction(_: State, fd: FormData): Promise<State> {
   const user = await assertPermission("lessons.write");
   const p = videoSchema.safeParse(Object.fromEntries(fd));
   if (!p.success) return { error: "Provide a valid https URL and provider." };
+  await assertCourseAccess(user, (await db.lesson.findUniqueOrThrow({ where: { id: p.data.lessonId } })).courseId);
   const v = await db.video.create({ data: { ...p.data, externalId: p.data.externalId || null, status: "READY" } });
   await audit(user.id, "video.add", "Video", v.id);
   revalidatePath("/admin/courses");
@@ -173,16 +191,24 @@ export async function addVideoAction(_: State, fd: FormData): Promise<State> {
 
 export async function deleteVideoAction(fd: FormData) {
   const user = await assertPermission("lessons.write");
-  await db.video.delete({ where: { id: String(fd.get("id")) } });
+  const vid = await db.video.findUniqueOrThrow({ where: { id: String(fd.get("id")) }, include: { lesson: true } });
+  await assertCourseAccess(user, vid.lesson.courseId);
+  await db.video.delete({ where: { id: vid.id } });
   await audit(user.id, "video.delete", "Video", String(fd.get("id")));
   revalidatePath("/admin/courses");
 }
 
 // ---------- Quizzes ----------
+async function assertQuizAccess(user: CurrentUser, quizId: string) {
+  await assertCourseAccess(user, (await db.quiz.findUniqueOrThrow({ where: { id: quizId } })).courseId);
+}
+
 export async function updateQuizAction(_: State, fd: FormData): Promise<State> {
   const user = await assertPermission("quizzes.write");
   const id = String(fd.get("id"));
   const status = z.nativeEnum(ContentStatus).parse(fd.get("status"));
+  if (status === "PUBLISHED") await assertPermission("courses.publish");
+  await assertQuizAccess(user, id);
   const passMark = z.coerce.number().int().min(0).max(100).parse(fd.get("passMark"));
   const maxAttempts = z.coerce.number().int().min(0).max(100).parse(fd.get("maxAttempts"));
   if (status === "PUBLISHED") {
@@ -206,6 +232,7 @@ export async function saveQuestionAction(_: State, fd: FormData): Promise<State>
   if (optionTexts.length < 2) return { error: "Add at least 2 options (one per line)." };
   if (![...correct].every((n) => n <= optionTexts.length) || !correct.size) return { error: "Correct answer numbers must refer to the options (e.g. 2 or 1,3)." };
   const q = await db.quizQuestion.findUniqueOrThrow({ where: { id } });
+  await assertQuizAccess(user, q.quizId);
   await db.$transaction([
     db.quizOption.deleteMany({ where: { questionId: id } }),
     db.quizQuestion.update({
@@ -225,6 +252,7 @@ export async function saveQuestionAction(_: State, fd: FormData): Promise<State>
 export async function addQuestionAction(fd: FormData) {
   const user = await assertPermission("quizzes.write");
   const quizId = String(fd.get("quizId"));
+  await assertQuizAccess(user, quizId);
   const last = await db.quizQuestion.findFirst({ where: { quizId }, orderBy: { position: "desc" } });
   await db.quizQuestion.create({ data: { quizId, position: (last?.position ?? 0) + 1, promptEn: "New question" } });
   await audit(user.id, "quiz.question.add", "Quiz", quizId);
@@ -233,7 +261,9 @@ export async function addQuestionAction(fd: FormData) {
 
 export async function deleteQuestionAction(fd: FormData) {
   const user = await assertPermission("quizzes.write");
-  const q = await db.quizQuestion.delete({ where: { id: String(fd.get("id")) } });
+  const qq = await db.quizQuestion.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+  await assertQuizAccess(user, qq.quizId);
+  const q = await db.quizQuestion.delete({ where: { id: qq.id } });
   await audit(user.id, "quiz.question.delete", "QuizQuestion", q.id);
   revalidatePath(`/admin/quizzes/${q.quizId}`);
 }
@@ -263,7 +293,7 @@ export async function setUserStatusAction(fd: FormData) {
   const target = await db.user.findUniqueOrThrow({ where: { id }, include: { roles: { include: { role: true } } } });
   if (target.roles.some((r) => r.role.key === "SUPER_ADMIN") && !user.roles.includes("SUPER_ADMIN")) throw new Error("Forbidden");
   await db.user.update({ where: { id }, data: { status } });
-  if (status !== "ACTIVE") await db.session.deleteMany({ where: { userId: id } });
+  if (status !== "ACTIVE") await db.$transaction([db.session.deleteMany({ where: { userId: id } }), db.authToken.deleteMany({ where: { userId: id } })]);
   await audit(user.id, "user.status", "User", id, { status });
   revalidatePath("/admin/users");
 }

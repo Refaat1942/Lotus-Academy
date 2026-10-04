@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import { assertUser, hashPassword, passwordProblem, verifyPassword } from "@/lib/auth";
+import { assertUser, createSession, hashPassword, passwordProblem, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { rateLimit } from "@/lib/ratelimit";
@@ -27,6 +27,8 @@ export async function changePasswordAction(_: State, fd: FormData): Promise<Stat
   const problem = passwordProblem(next);
   if (problem) return { error: problem };
   await db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(next) } });
+  await db.session.deleteMany({ where: { userId: u.id } }); // end every other session
+  await createSession(u.id);
   await audit(u.id, "auth.password_change", "User", u.id);
   return { ok: "Password changed." };
 }

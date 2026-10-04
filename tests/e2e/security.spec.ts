@@ -145,7 +145,7 @@ test("login rate limiting / account lockout, no user enumeration", async ({ page
 
 test("open redirect is blocked and security headers are present", async ({ page, request }) => {
   await resetRateLimits();
-  await page.goto("/login?next=//evil.example.com");
+  await page.goto("/login?next=" + encodeURIComponent("/\\evil.example.com"));
   await page.getByLabel("Email address").fill(B);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();

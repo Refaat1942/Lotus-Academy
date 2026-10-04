@@ -97,7 +97,7 @@ export async function loginAction(_: State, fd: FormData): Promise<State> {
   log("info", "auth.login", { userId: user.id });
   const staff = user.roles.some((r) => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR", "CONTENT_MANAGER", "SUPPORT"].includes(r.role.key));
   const next = String(fd.get("next") ?? "");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : staff ? "/admin" : "/dashboard");
+  redirect(/^\/(?![\/\\])/.test(next) ? next : staff ? "/admin" : "/dashboard");
 }
 
 export async function logoutAction() {
@@ -111,7 +111,9 @@ export async function verifyEmailAction(fd: FormData) {
   if (!rec || rec.type !== "EMAIL_VERIFY" || rec.usedAt || rec.expiresAt < new Date()) redirect("/verify-email?bad=1");
   const user = await db.$transaction(async (tx) => {
     await tx.authToken.update({ where: { id: rec.id }, data: { usedAt: new Date() } });
-    return tx.user.update({ where: { id: rec.userId }, data: { emailVerifiedAt: new Date(), status: "ACTIVE" } });
+    // Only PENDING accounts are activated: a suspended/disabled user can't self-reactivate with an old token.
+    await tx.user.updateMany({ where: { id: rec.userId, status: "PENDING" }, data: { emailVerifiedAt: new Date(), status: "ACTIVE" } });
+    return tx.user.findUniqueOrThrow({ where: { id: rec.userId } });
   });
   void sendMail(user.email, "welcome", { name: user.firstName });
   redirect("/login?verified=1");

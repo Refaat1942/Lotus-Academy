@@ -16,7 +16,7 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
   },
   INSTRUCTOR: {
     name: "Instructor",
-    permissions: ["courses.read", "courses.write", "lessons.write", "quizzes.write", "enrollments.read", "reports.read"],
+    permissions: ["courses.read", "courses.write", "lessons.write", "quizzes.write"],
   },
   CONTENT_MANAGER: {
     name: "Content Manager",

@@ -100,19 +100,23 @@ export async function completeLesson(userId: string, lessonId: string) {
 
 export async function submitQuiz(userId: string, quizId: string, submitted: Record<string, string[]>) {
   const quiz = await db.quiz.findFirst({
-    where: { id: quizId, status: "PUBLISHED" },
+    where: { id: quizId, status: "PUBLISHED", course: { status: "PUBLISHED", deletedAt: null }, OR: [{ lessonId: null }, { lesson: { status: "PUBLISHED", deletedAt: null } }] },
     include: { questions: { orderBy: { position: "asc" }, include: { options: true } } },
   });
   if (!quiz) throw new Error("Quiz not available");
   await requireActiveEnrollment(userId, quiz.courseId);
-  const used = await db.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null } } });
-  if (attemptsRemaining(quiz.maxAttempts, used) === 0) throw new Error("No attempts remaining");
   const graded = gradeQuiz(quiz.questions, submitted, quiz.passMark);
-  const attempt = await db.quizAttempt.create({
+  // Serialize per user+quiz so concurrent submissions cannot exceed maxAttempts.
+  const attempt = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId + ":" + quizId}))`;
+    const used = await tx.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null } } });
+    if (attemptsRemaining(quiz.maxAttempts, used) === 0) throw new Error("No attempts remaining");
+    return tx.quizAttempt.create({
     data: {
       userId, quizId, scorePct: graded.scorePct, passed: graded.passed, submittedAt: new Date(),
       answers: { create: graded.results.map((r) => ({ questionId: r.questionId, optionIds: r.optionIds, isCorrect: r.isCorrect })) },
     },
+    });
   });
   const course = await recomputeCourse(userId, quiz.courseId);
   return { attemptId: attempt.id, scorePct: graded.scorePct, passed: graded.passed, courseComplete: course.complete };

@@ -12,7 +12,7 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
   const { slug, lessonSlug } = await params;
   const { t } = await getT();
   const user = await requireUser();
-  const lesson = await db.lesson.findFirst({ where: { slug: lessonSlug, course: { slug, status: "PUBLISHED" }, deletedAt: null } });
+  const lesson = await db.lesson.findFirst({ where: { slug: lessonSlug, status: "PUBLISHED", course: { slug, status: "PUBLISHED" }, deletedAt: null } });
   if (!lesson) notFound();
   const enr = await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: lesson.courseId } } });
   if (!enr || enr.status === "CANCELLED") redirect(`/courses/${slug}`);

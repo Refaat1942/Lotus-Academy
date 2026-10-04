@@ -80,12 +80,20 @@ describe("quizzes", () => {
     expect(await db.certificate.count({ where: { userId, courseId: cv } })).toBe(1);
   });
   it("rejects quiz submission without enrollment and limits attempts", async () => {
-    const q = await db.quiz.findFirstOrThrow({ where: { status: "PUBLISHED", course: { code: "EG-MED-02" } } });
+    const q = await db.quiz.findFirstOrThrow({ where: { status: "PUBLISHED", course: { code: "EG-MED-02" } }, orderBy: { createdAt: "desc" } });
     await expect(submitQuiz(otherId, q.id, {})).rejects.toThrow(/Not enrolled/);
     await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 1 } });
     await enroll(otherId, q.courseId);
     await submitQuiz(otherId, q.id, {});
     await expect(submitQuiz(otherId, q.id, {})).rejects.toThrow(/No attempts remaining/);
+    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 0 } });
+  });
+  it("cannot exceed maxAttempts with concurrent submissions", async () => {
+    const q = await db.quiz.findFirstOrThrow({ where: { status: "PUBLISHED", course: { code: "EG-MED-02" } }, orderBy: { createdAt: "desc" } });
+    await db.quizAttempt.deleteMany({ where: { userId: otherId, quizId: q.id } });
+    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 2 } });
+    const res = await Promise.allSettled(Array.from({ length: 6 }, () => submitQuiz(otherId, q.id, {})));
+    expect(res.filter((r) => r.status === "fulfilled")).toHaveLength(2);
     await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 0 } });
   });
 });

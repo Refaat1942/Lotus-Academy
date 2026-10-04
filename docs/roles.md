@@ -8,7 +8,7 @@ Permissions (`src/lib/permissions.ts`): `users.read/write`, `roles.write`, `cour
 | SUPER_ADMIN | everything incl. `roles.write` (only role that can grant/revoke roles) |
 | ADMIN | everything except `roles.write` |
 | CONTENT_MANAGER | courses r/w/publish, lessons, quizzes |
-| INSTRUCTOR | courses r/w, lessons, quizzes, enrollments.read, reports.read (no publish) |
+| INSTRUCTOR | courses r/w, lessons, quizzes — only for courses they are assigned to (no publish, no learner data) |
 | SUPPORT | read-only: users, courses, enrollments, certificates, emails |
 | STUDENT | none (learner area only) |
 
