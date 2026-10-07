@@ -39,7 +39,7 @@ Useful for: customers with irritated or tight skin after sun, shaving or heat wh
 | Product | What the Lotus sheet says | Who it suits and what to say |
 |---|---|---|
 | **Emollient Cream 150 ml** | Ordinary daily moisturiser | Dry or normal-to-dry skin that needs an everyday cream. |
-| **Emollient Extreme 200 ml** | Strong moisturiser for severe dryness of mild and moderate skin, face and body | Very dry skin on the face and body. "A stronger moisturiser for very dry skin." |
+| **Emollient Extreme 200 ml** | Strong moisturiser for severe dryness, face and body (the sheet also mentions "mild and moderate" skin; wording unclear, verify) | Very dry skin on the face and body. "A stronger moisturiser for very dry skin." |
 | **Xemose** | For eczema and severe dryness, face and body | Very dry skin. If the customer mentions eczema, see below. |
 | **Bariederm Cream 75 ml** | Barrier cream for women during housework, for nappy rash in babies, and for the treatment and prevention of eczema (as worded in the sheet) | Hands exposed to water and cleaning products; nappy area. Do not promise an eczema cure; refer to a doctor when eczema is suspected. |
 
