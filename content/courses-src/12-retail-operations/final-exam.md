@@ -52,14 +52,14 @@
 
 **Q9.** Which statement about pharmacy fridges is correct?
 - a) Staff drinks may be kept on the bottom shelf
-- b) Products should be packed against the back wall to save space
+- b) It holds medicines and health products only, with space for air and products in their original boxes ✓
 - c) The fridge should be opened often to check the products
-- d) It holds medicines and health products only, with space for air and products in their original boxes ✓
+- d) Products should be packed against the back wall to save space
 
 **Q10.** The fridge temperature reading is outside the acceptable range. What is the correct response?
 - a) Write the number and continue as normal
-- b) Separate and mark the products, record the event and inform the pharmacist and the manager at once ✓
-- c) Change the reading to a normal value
+- b) Change the reading to a normal value
+- c) Separate and mark the products, record the event and inform the pharmacist and the manager at once ✓
 - d) Wait until tomorrow
 
 **Q11.** A power cut stops the fridge during a hot afternoon. What is the first general action?
@@ -69,27 +69,27 @@
 - d) Put everything in the freezer
 
 **Q12.** After a temperature excursion, a customer asks to buy an affected product and says it "looks fine". What should the pharmacist do?
-- a) Sell it with a discount
-- b) Not sell it until its status is confirmed, using the leaflet, manufacturer guidance and the SOP, and offer another route ✓
+- a) Not sell it until its status is confirmed, using the leaflet, manufacturer guidance and the SOP, and offer another route ✓
+- b) Sell it with a discount
 - c) Sell it because there is no visible damage
 - d) Tell the customer to keep it in the fridge at home
 
 **Q13.** Which of these protects price accuracy best?
-- a) Checking the shelf tag, the system price and the receipt
+- a) Letting any cashier edit the price at the till
 - b) Changing prices on the shelf only
 - c) Rounding prices up for convenience
-- d) Letting any cashier edit the price at the till ✓
+- d) Checking the shelf tag, the system price and the receipt ✓
 
 **Q14.** What should happen before a promotion starts?
-- a) Nothing, the tag is enough
-- b) It is approved, loaded and tested in the system, tagged with dates and conditions and briefed to the team ✓
+- a) It is approved, loaded and tested in the system, tagged with dates and conditions and briefed to the team ✓
+- b) Nothing, the tag is enough
 - c) Only the manager is informed
 - d) The old stock is hidden
 
 **Q15.** At closing, the cash drawer is short. What is the right approach?
 - a) Add personal money to match the system
-- b) Recount with the manager, review receipts, record the difference and look for the cause ✓
-- c) Move money from another drawer
+- b) Move money from another drawer
+- c) Recount with the manager, review receipts, record the difference and look for the cause ✓
 - d) Delete the day's sales
 
 **Q16.** A customer returns a medicine that left the pharmacy the day before and asks for a refund. What is the right approach?
@@ -100,8 +100,8 @@
 
 **Q17.** A technician finds temperature log entries missing for yesterday. What is the correct action?
 - a) Fill them in with normal values
-- b) Copy the previous day's values
-- c) Leave the gap honestly, report it to the manager and record today's reading ✓
+- b) Leave the gap honestly, report it to the manager and record today's reading ✓
+- c) Copy the previous day's values
 - d) Remove the log page
 
 **Q18.** A regular customer asks for a prescription-only medicine without a prescription. What should the pharmacist do?
