@@ -54,12 +54,14 @@ export function resumeLesson(
 export interface SourceQuestion {
   id: string;
   promptEn: string;
-  options: { id: string; textEn: string; isCorrect: boolean }[];
+  promptAr?: string | null;
+  options: { id: string; textEn: string; textAr?: string | null; isCorrect: boolean }[];
 }
 export interface PoolQuestion {
   id: string;
   prompt: string;
-  options: { id: string; text: string; isCorrect: boolean }[];
+  promptAr?: string | null;
+  options: { id: string; text: string; textAr?: string | null; isCorrect: boolean }[];
 }
 
 function hash(s: string): number {
@@ -84,20 +86,22 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
  * correct answers in the same lesson, so the server can always recompute the identical options.
  */
 export function buildCheckpointPool(questions: SourceQuestion[]): PoolQuestion[] {
-  const correctTexts = [...new Set(questions.flatMap((q) => q.options.filter((o) => o.isCorrect).map((o) => o.textEn)))];
+  const arOf = new Map<string, string | null | undefined>();
+  for (const q of questions) for (const o of q.options) if (o.isCorrect) arOf.set(o.textEn, o.textAr);
+  const correctTexts = [...arOf.keys()];
   const pool: PoolQuestion[] = [];
   for (const q of questions) {
     const correct = q.options.filter((o) => o.isCorrect);
     if (!correct.length) continue;
     if (q.options.length >= 2) {
-      pool.push({ id: q.id, prompt: q.promptEn, options: q.options.map((o) => ({ id: o.id, text: o.textEn, isCorrect: o.isCorrect })) });
+      pool.push({ id: q.id, prompt: q.promptEn, promptAr: q.promptAr, options: q.options.map((o) => ({ id: o.id, text: o.textEn, textAr: o.textAr, isCorrect: o.isCorrect })) });
       continue;
     }
     const own = correct[0].textEn;
     const distractors = seededShuffle(correctTexts.filter((t) => t !== own), q.id).slice(0, 3);
     if (distractors.length < 2) continue;
-    const opts = [{ id: `${q.id}#c`, text: own, isCorrect: true }, ...distractors.map((t, i) => ({ id: `${q.id}#d${i}`, text: t, isCorrect: false }))];
-    pool.push({ id: q.id, prompt: q.promptEn, options: seededShuffle(opts, q.id + "o") });
+    const opts = [{ id: `${q.id}#c`, text: own, textAr: correct[0].textAr, isCorrect: true }, ...distractors.map((t, i) => ({ id: `${q.id}#d${i}`, text: t, textAr: arOf.get(t), isCorrect: false }))];
+    pool.push({ id: q.id, prompt: q.promptEn, promptAr: q.promptAr, options: seededShuffle(opts, q.id + "o") });
   }
   return pool;
 }

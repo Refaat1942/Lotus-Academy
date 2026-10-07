@@ -120,6 +120,10 @@ const lessonSchema = z.object({
   titleEn: z.string().trim().min(1).max(200),
   titleAr: z.string().trim().max(200).optional(),
   bodyMd: z.string().max(200000),
+  bodyMdAr: z.string().max(200000).optional(),
+  objectivesAr: z.string().max(5000).optional(),
+  videoScriptEn: z.string().max(20000).optional(),
+  videoScriptAr: z.string().max(20000).optional(),
   durationMinutes: z.coerce.number().int().min(0).max(10000),
   objectives: z.string().max(5000).optional(),
   status: z.nativeEnum(ContentStatus),
@@ -137,7 +141,7 @@ export async function updateLessonAction(_: State, fd: FormData): Promise<State>
   await assertCourseAccess(user, (await db.lesson.findUniqueOrThrow({ where: { id } })).courseId);
   const lesson = await db.lesson.update({
     where: { id },
-    data: { titleEn: d.titleEn, titleAr: d.titleAr || null, bodyMd: d.bodyMd, durationMinutes: d.durationMinutes, objectives: lines(d.objectives ?? ""), status: d.status, isPreview: d.isPreview === "on", requireCheckpoint: d.requireCheckpoint === "on", searchText: `${d.titleEn} ${d.bodyMd}`.slice(0, 20000) },
+    data: { titleEn: d.titleEn, titleAr: d.titleAr || null, bodyMd: d.bodyMd, bodyMdAr: d.bodyMdAr?.trim() ? d.bodyMdAr : null, objectivesAr: lines(d.objectivesAr ?? ""), videoScriptEn: d.videoScriptEn?.trim() || null, videoScriptAr: d.videoScriptAr?.trim() || null, durationMinutes: d.durationMinutes, objectives: lines(d.objectives ?? ""), status: d.status, isPreview: d.isPreview === "on", requireCheckpoint: d.requireCheckpoint === "on", searchText: `${d.titleEn} ${d.bodyMd}`.slice(0, 20000) },
   });
   await audit(user.id, "lesson.update", "Lesson", id);
   revalidatePath(`/admin/courses/${lesson.courseId}`);
@@ -329,6 +333,7 @@ export async function archiveLessonAction(fd: FormData) {
 const videoSchema = z.object({
   lessonId: z.string(),
   provider: z.enum(["YOUTUBE", "VIMEO", "PRIVATE", "OBJECT_STORAGE", "CDN"]),
+  language: z.enum(["en", "ar", "all"]).default("all"),
   externalId: z.string().trim().max(100).optional(),
   url: z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "https only"),
   durationSec: z.coerce.number().int().min(0).optional(),

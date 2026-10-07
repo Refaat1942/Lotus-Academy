@@ -15,6 +15,10 @@ const THEMES: Record<string, CategoryTheme> = {
   "gi-respiratory": { accent: "#0891B2", dark: "#055468", soft: "#E0F4F9", label: "GI & Respiratory" },
   pediatrics: { accent: "#EA580C", dark: "#9A3608", soft: "#FEEBDF", label: "Pediatrics" },
   "womens-health": { accent: "#DB2777", dark: "#8E1650", soft: "#FCE7F1", label: "Women's Health" },
+  "retail-excellence": { accent: "#4338CA", dark: "#27207F", soft: "#E8E7FA", label: "Retail Excellence" },
+  "professional-skills": { accent: "#0F766E", dark: "#09504B", soft: "#DDF3F0", label: "Professional Skills" },
+  dermocosmetics: { accent: "#A21CAF", dark: "#6B0F74", soft: "#F6E6F8", label: "Dermocosmetics" },
+  "hair-scalp-care": { accent: "#9A6A2F", dark: "#62431B", soft: "#F6EBDC", label: "Hair & Scalp Care" },
 };
 const DEFAULT: CategoryTheme = { accent: "#006F3C", dark: "#004A28", soft: "#E6F5ED", label: "Professional Development" };
 

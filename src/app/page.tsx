@@ -90,7 +90,7 @@ export default async function Home() {
 
       <Reveal><section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
         <SectionHead eyebrow={t("nav.categories")} title={t("home.categories")} />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
           {categories.map((c) => {
             const Icon = categoryIcon(c.slug);
             return (

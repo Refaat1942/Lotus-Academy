@@ -34,14 +34,20 @@ export default async function EditLesson({ params }: { params: Promise<{ id: str
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="requireCheckpoint" defaultChecked={l.requireCheckpoint} /> Require a “check your understanding” question before the learner can continue</label>
               <div><label className="label" htmlFor="objectives">Learning objectives (one per line)</label><textarea id="objectives" name="objectives" rows={4} defaultValue={l.objectives.join("\n")} className="input" /></div>
               <div><label className="label" htmlFor="bodyMd">Content (Markdown)</label><textarea id="bodyMd" name="bodyMd" rows={22} defaultValue={l.bodyMd} className="input font-mono text-xs" /></div>
+              <div><label className="label" htmlFor="objectivesAr">Learning objectives — Arabic (one per line)</label><textarea id="objectivesAr" name="objectivesAr" dir="rtl" rows={3} defaultValue={l.objectivesAr.join("\n")} className="input" /></div>
+              <div><label className="label" htmlFor="bodyMdAr">Content — Arabic (Markdown)</label><textarea id="bodyMdAr" name="bodyMdAr" dir="rtl" rows={18} defaultValue={l.bodyMdAr ?? ""} className="input font-mono text-xs" /></div>
+              <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Video production scripts (not shown to learners)</summary>
+                <div className="mt-3 space-y-3"><div><label className="label" htmlFor="videoScriptEn">English script</label><textarea id="videoScriptEn" name="videoScriptEn" rows={8} defaultValue={l.videoScriptEn ?? ""} className="input text-xs" /></div>
+                <div><label className="label" htmlFor="videoScriptAr">Arabic script</label><textarea id="videoScriptAr" name="videoScriptAr" dir="rtl" rows={8} defaultValue={l.videoScriptAr ?? ""} className="input text-xs" /></div></div></details>
             </ActionForm>
           ) : <p className="text-sm text-muted">Read-only.</p>}
         </section>
         <div className="space-y-8">
           <section className="card p-5"><h2 className="mb-3 font-semibold">Videos</h2>
-            <ul className="mb-4 space-y-2 text-sm">{l.videos.map((v) => <li key={v.id} className="flex items-center justify-between gap-2"><span className="truncate">{v.provider} · {v.url}</span>{can && <ConfirmAction action={deleteVideoAction} fields={{ id: v.id }} label="Delete" message="Remove this video?" danger />}</li>)}{!l.videos.length && <li className="text-muted">No videos</li>}</ul>
+            <ul className="mb-4 space-y-2 text-sm">{l.videos.map((v) => <li key={v.id} className="flex items-center justify-between gap-2"><span className="truncate">[{v.language.toUpperCase()}] {v.provider} · {v.url}</span>{can && <ConfirmAction action={deleteVideoAction} fields={{ id: v.id }} label="Delete" message="Remove this video?" danger />}</li>)}{!l.videos.length && <li className="text-muted">No videos</li>}</ul>
             {can && <ActionForm action={addVideoAction} submitLabel="Add video" buttonClass="btn-secondary">
               <input type="hidden" name="lessonId" value={l.id} />
+              <div><label className="label" htmlFor="language">Video language</label><select id="language" name="language" className="input"><option value="ar">Arabic</option><option value="en">English</option><option value="all">Both / language-neutral</option></select></div>
               <div><label className="label" htmlFor="provider">Provider</label><select id="provider" name="provider" className="input"><option>YOUTUBE</option><option>VIMEO</option><option>PRIVATE</option><option>OBJECT_STORAGE</option><option>CDN</option></select></div>
               <div><label className="label" htmlFor="externalId">External ID (YouTube/Vimeo)</label><input id="externalId" name="externalId" className="input" /></div>
               <div><label className="label" htmlFor="url">URL (https)</label><input id="url" name="url" type="url" required className="input" /></div>

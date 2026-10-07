@@ -1,5 +1,8 @@
 export const en = {
   "search.placeholder": "I'm looking for a course, topic or drug class…",
+  "legal.copyright": "© Lotus Pharmacies — Lotus Academy. This material is the property of Lotus and may not be copied, shared or redistributed without written permission.",
+  "learn.finalExam": "Final exam", "learn.finalExam.desc": "You have completed every lesson. Pass the final exam to finish the course and receive your certificate.", "learn.finalExam.start": "Start the final exam",
+  "learn.finalExam.locked": "Complete all lessons to unlock the final exam.", "learn.finalExam.title": "Final exam",
   "brand.name": "LOTUS ACADEMY",
   "brand.academy": "Academy",
   "brand.subtitle": "Pharmacy Education & Professional Development",

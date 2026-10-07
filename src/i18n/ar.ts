@@ -2,6 +2,9 @@ import type { MessageKey } from "./en";
 
 export const ar: Record<MessageKey, string> = {
   "search.placeholder": "أبحث عن دورة أو موضوع أو مجموعة دوائية…",
+  "legal.copyright": "© صيدليات لوتس — أكاديمية لوتس. هذه المادة ملك لشركة لوتس ولا يجوز نسخها أو مشاركتها أو إعادة توزيعها دون إذن كتابي.",
+  "learn.finalExam": "الاختبار النهائي", "learn.finalExam.desc": "لقد أتممت جميع الدروس. اجتز الاختبار النهائي لإنهاء الدورة والحصول على شهادتك.", "learn.finalExam.start": "ابدأ الاختبار النهائي",
+  "learn.finalExam.locked": "أكمل جميع الدروس لفتح الاختبار النهائي.", "learn.finalExam.title": "الاختبار النهائي",
   "brand.name": "أكاديمية لوتس",
   "brand.academy": "الأكاديمية",
   "brand.subtitle": "للتعليم والتطوير المهني للصيادلة",

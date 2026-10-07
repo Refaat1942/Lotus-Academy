@@ -51,7 +51,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   }
   await markLessonViewed(user.id, lesson.id);
 
-  const [courseProg, bookmark, quiz, videos, assets, attempts, checkpoint] = await Promise.all([
+  const [courseProg, bookmark, quiz, videos, assets, attempts, checkpoint, finalExam] = await Promise.all([
     db.courseProgress.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }),
     db.bookmark.findUnique({ where: { userId_lessonId: { userId: user.id, lessonId: lesson.id } } }),
     db.quiz.findFirst({ where: { lessonId: lesson.id, status: "PUBLISHED" }, include: { _count: { select: { questions: true } } } }),
@@ -59,8 +59,11 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
     db.lessonAsset.findMany({ where: { lessonId: lesson.id }, orderBy: { createdAt: "asc" } }),
     db.quizAttempt.findMany({ where: { userId: user.id, quiz: { lessonId: lesson.id }, submittedAt: { not: null } }, orderBy: { startedAt: "desc" }, take: 1 }),
     done.has(lesson.id) ? null : getCheckpoint(user.id, lesson.id),
+    db.quiz.findFirst({ where: { courseId: course.id, lessonId: null, status: "PUBLISHED" }, select: { id: true } }),
   ]);
-  const html = renderMarkdown(lesson.bodyMd);
+  const useAr = locale === "ar" && !!lesson.bodyMdAr;
+  const html = renderMarkdown(useAr ? lesson.bodyMdAr! : lesson.bodyMd);
+  const objectives = locale === "ar" && lesson.objectivesAr.length ? lesson.objectivesAr : lesson.objectives;
   const prev = lessons[idx - 1];
   const next = lessons[idx + 1];
   const lessonDone = done.has(lesson.id);
@@ -117,11 +120,16 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
           {locale === "en" && lesson.titleAr && <p lang="ar" dir="rtl" className="mt-1 text-muted">{lesson.titleAr}</p>}
 
           <div className="mt-6 space-y-6">
-            {videos.map((v) => <VideoEmbed key={v.id} v={v} />)}
-            {lesson.objectives.length > 0 && (
-              <section className="card border-s-4 p-5" style={{ borderInlineStartColor: "var(--accent)" }}><h2 className="mb-2 font-bold">{t("learn.objectives")}</h2><ul className="list-disc space-y-1 ps-5 text-sm">{lesson.objectives.map((o) => <li key={o}>{o.replace(/\*\*/g, "")}</li>)}</ul></section>
+            {[...videos].sort((a, b) => (a.language === locale ? -1 : 0) - (b.language === locale ? -1 : 0)).map((v) => (
+              <div key={v.id} className="space-y-2">
+                {videos.length > 1 && v.language !== "all" && <p className="text-xs font-semibold uppercase tracking-wider text-muted">{v.language === "ar" ? "العربية" : "English"}</p>}
+                <VideoEmbed v={v} />
+              </div>
+            ))}
+            {objectives.length > 0 && (
+              <section className="card border-s-4 p-5" style={{ borderInlineStartColor: "var(--accent)" }}><h2 className="mb-2 font-bold">{t("learn.objectives")}</h2><ul className="list-disc space-y-1 ps-5 text-sm">{objectives.map((o) => <li key={o}>{o.replace(/\*\*/g, "")}</li>)}</ul></section>
             )}
-            <div className="prose-lotus rounded-2xl bg-surface p-6 shadow-card sm:p-8" dir="ltr" lang="en" dangerouslySetInnerHTML={{ __html: html }} />
+            <div className="prose-lotus rounded-2xl bg-surface p-6 shadow-card sm:p-8" dir={useAr ? "rtl" : "ltr"} lang={useAr ? "ar" : "en"} dangerouslySetInnerHTML={{ __html: html }} />
             {assets.length > 0 && (
               <section className="card p-5"><h2 className="mb-3 font-bold">{t("learn.attachments")}</h2>
                 <ul className="grid gap-2 sm:grid-cols-2">{assets.map((a) => (
@@ -143,11 +151,11 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
                 <input type="hidden" name="lessonId" value={lesson.id} /><input type="hidden" name="back" value={here} />
                 {checkpoint.questions.map((q, qi) => (
                   <fieldset key={q.id}>
-                    <legend className="font-semibold"><span className="text-muted">{qi + 1}. </span>{q.prompt}</legend>
+                    <legend className="font-semibold" dir="auto"><span className="text-muted">{qi + 1}. </span>{pick(locale, q.prompt, q.promptAr)}</legend>
                     <p className="mb-2 text-xs text-muted">{q.multi ? t("quiz.multi") : t("quiz.single")}</p>
                     <div className="space-y-2">{q.options.map((o) => (
                       <label key={o.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-sm transition-colors hover:bg-[var(--soft)] has-[:checked]:border-[var(--accent)] has-[:checked]:bg-[var(--soft)]">
-                        <input type={q.multi ? "checkbox" : "radio"} name={`q_${q.id}`} value={o.id} required={!q.multi} className="mt-1" /><span>{o.text}</span>
+                        <input type={q.multi ? "checkbox" : "radio"} name={`q_${q.id}`} value={o.id} required={!q.multi} className="mt-1" /><span dir="auto">{pick(locale, o.text, o.textAr)}</span>
                       </label>))}</div>
                   </fieldset>
                 ))}
@@ -162,6 +170,9 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
               <div><h2 className="font-bold">{t("quiz.title")}</h2><p className="text-sm text-muted">{quiz._count.questions} · {t("quiz.passMark")} {quiz.passMark}%{attempts[0] ? ` · ${t("quiz.score")}: ${attempts[0].scorePct}% (${attempts[0].passed ? t("quiz.passed") : t("quiz.failed")})` : ""}</p></div>
               <Link className="btn-secondary" href={`${here}/quiz`}>{t("learn.quiz")}</Link>
             </section>
+          )}
+          {!next && lessonDone && finalExam && !certificate && (
+            <section className="mt-8 rounded-2xl border-2 p-5" style={{ borderColor: "var(--accent)", background: "var(--soft)" }}><h2 className="font-bold">{t("learn.finalExam")}</h2><p className="mt-1 text-sm text-muted">{t("learn.finalExam.desc")}</p><Link className="btn-primary mt-3" href={`/learn/${course.slug}/final-exam`} style={{ background: "var(--accent)" }}>{t("learn.finalExam.start")}</Link></section>
           )}
           {certificate && (
             <section className="mt-8 rounded-2xl border border-success/30 bg-success/10 p-5"><h2 className="font-bold text-success">{t("learn.courseDone")}</h2><Link className="btn-primary mt-3" href={`/certificates/${certificate.publicId}`}>{t("learn.viewCert")}</Link></section>
@@ -180,6 +191,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
                 : <span className="btn-secondary !cursor-not-allowed opacity-60" aria-disabled="true"><Lock size={15} aria-hidden />{t("learn.next")}</span>)}
             </div>
           </div>
+          <p className="mt-10 text-center text-xs text-muted">{t("legal.copyright")}</p>
         </article>
       </div>
       <AssistantChat courseId={course.id} lessonId={lesson.id} />

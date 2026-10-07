@@ -41,6 +41,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const user = await getCurrentUser();
   const enrollment = user ? await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null;
   const enrolled = !!enrollment && enrollment.status !== "CANCELLED";
+  const finalQuiz = await db.quiz.findFirst({ where: { courseId: course.id, lessonId: null, status: "PUBLISHED" }, select: { id: true, passMark: true, _count: { select: { questions: true } }, attempts: user ? { where: { userId: user.id, passed: true }, select: { id: true }, take: 1 } : false } });
   const [progress, done, related] = await Promise.all([
     user ? db.courseProgress.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null,
     user ? db.lessonProgress.findMany({ where: { userId: user.id, courseId: course.id, completedAt: { not: null } }, select: { lessonId: true } }) : [],
@@ -128,6 +129,17 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                 </li>
               )); })()}
             </ol>
+            {finalQuiz && (() => {
+              const allDone = lessons.length > 0 && lessons.every((l) => doneSet.has(l.id));
+              const passed = !!(finalQuiz as { attempts?: unknown[] }).attempts?.length;
+              return (
+                <div className="mt-8 flex flex-wrap items-center gap-4 rounded-2xl border-2 p-5" style={{ borderColor: "var(--accent)", background: "var(--soft)" }}>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full text-white" style={{ background: "var(--accent)" }}>{passed ? <CheckCircle2 size={20} aria-hidden /> : allDone || !enrolled ? <ClipboardList size={20} aria-hidden /> : <Lock size={18} aria-hidden />}</span>
+                  <div className="min-w-0 flex-1"><h3 className="font-bold" style={{ color: "var(--accent-dark)" }}>{t("learn.finalExam.title")}</h3><p className="text-sm text-muted">{finalQuiz._count.questions} · {t("quiz.passMark")} {finalQuiz.passMark}%{enrolled && !allDone ? ` · ${t("learn.finalExam.locked")}` : ""}</p></div>
+                  {enrolled && allDone && !passed && <Link href={`/learn/${course.slug}/final-exam`} className="btn-primary" style={{ background: "var(--accent)" }}>{t("learn.finalExam.start")}</Link>}
+                </div>
+              );
+            })()}
           </section>
         </div>
         <aside className="space-y-8">

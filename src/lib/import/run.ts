@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
 import { ContentStatus, Prisma, PrismaClient, QuestionType } from "@prisma/client";
-import { isUsableQuestion, parseLesson, parseOverview, ParsedLesson } from "./parse";
+import { isUsableQuestion, parseExam, parseLesson, parseOverview, parseOverviewAr, parseVideoScript, ParsedLesson, ParsedQuestion } from "./parse";
 
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
 const MAX_ENTRIES = 500;
@@ -17,6 +17,13 @@ const CATEGORY_BY_FOLDER: Record<string, { slug: string; nameEn: string; nameAr:
   "gi-respiratory": { slug: "gi-respiratory", nameEn: "GI & Respiratory", nameAr: "الجهاز الهضمي والتنفسي", order: 5 },
   pediatrics: { slug: "pediatrics", nameEn: "Pediatrics", nameAr: "طب الأطفال", order: 6 },
   "womens-health": { slug: "womens-health", nameEn: "Women's Health", nameAr: "صحة المرأة", order: 7 },
+  "selling-skills": { slug: "retail-excellence", nameEn: "Retail Excellence", nameAr: "التميز في التجزئة", order: 8 },
+  "customer-experience": { slug: "retail-excellence", nameEn: "Retail Excellence", nameAr: "التميز في التجزئة", order: 8 },
+  "retail-operations": { slug: "retail-excellence", nameEn: "Retail Excellence", nameAr: "التميز في التجزئة", order: 8 },
+  "communication-skills": { slug: "professional-skills", nameEn: "Professional Skills", nameAr: "المهارات المهنية", order: 9 },
+  "dermocosmetics-skin-care-1": { slug: "dermocosmetics", nameEn: "Dermocosmetics", nameAr: "مستحضرات التجميل الطبية", order: 10 },
+  "dermocosmetics-skin-care-2": { slug: "dermocosmetics", nameEn: "Dermocosmetics", nameAr: "مستحضرات التجميل الطبية", order: 10 },
+  "hair-scalp-care": { slug: "hair-scalp-care", nameEn: "Hair & Scalp Care", nameAr: "العناية بالشعر وفروة الرأس", order: 11 },
 };
 
 export interface ArchiveRecord {
@@ -157,11 +164,25 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
   const cat = CATEGORY_BY_FOLDER[folderSlug];
   const slug = slugify(ov.titleEn) || folderSlug;
 
-  const lessonPaths = [...a.files.keys()].filter((n) => n.startsWith(`${base}/lessons/`)).sort();
-  const parsed: { file: string; path: string; hash: string; lesson: ParsedLesson }[] = lessonPaths.map((p) => {
+  // Lessons live in "<base>/lessons/" (older archives) or directly in "<base>/" (bilingual format).
+  const isLessonFile = (n: string) => n.startsWith(`${base}/`) && /(^|\/)lesson-[\w-]+\.md$/.test(n) && !/\.(ar|video)\.md$/.test(n);
+  const lessonPaths = [...a.files.keys()].filter(isLessonFile).sort();
+  const parsed: { file: string; path: string; hash: string; lesson: ParsedLesson; ar: ParsedLesson | null; video: { en: string | null; ar: string | null } | null }[] = lessonPaths.map((p) => {
     const raw = a.files.get(p)!;
-    return { file: path.basename(p), path: p, hash: sha(raw), lesson: parseLesson(raw.toString("utf8")) };
+    const arRaw = a.files.get(p.replace(/\.md$/, ".ar.md"));
+    const vidRaw = a.files.get(p.replace(/\.md$/, ".video.md"));
+    return {
+      file: path.basename(p), path: p, hash: sha(raw), lesson: parseLesson(raw.toString("utf8")),
+      ar: arRaw ? parseLesson(arRaw.toString("utf8")) : null,
+      video: vidRaw ? parseVideoScript(vidRaw.toString("utf8")) : null,
+    };
   });
+  const arOvRaw = a.files.get(`${base}/course-overview.ar.md`);
+  const arOv = arOvRaw ? parseOverviewAr(arOvRaw.toString("utf8")) : null;
+  const finalEn = a.files.get(`${base}/final-exam.md`);
+  const finalAr = a.files.get(`${base}/final-exam.ar.md`);
+  const finalQs: ParsedQuestion[] = finalEn ? parseExam(finalEn.toString("utf8")) : [];
+  const finalArQs: ParsedQuestion[] = finalAr ? parseExam(finalAr.toString("utf8")) : [];
   // Use the overview's lesson index for ordering when it is complete, else file name order.
   const order = ov.lessonFiles.length === parsed.length ? ov.lessonFiles : parsed.map((p) => p.file);
   parsed.sort((x, y) => order.indexOf(x.file) - order.indexOf(y.file));
@@ -171,7 +192,8 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
     if (!p.lesson.objectives.length) report.warnings.push(`${a.fileName}/${p.file}: no learning objectives found`);
   }
 
-  const courseHash = sha(sha(overviewSrc) + parsed.map((p) => p.hash).join(""));
+  // The hash covers every source file of the course (EN/AR lessons, video scripts, exams), so any edit re-imports it.
+  const courseHash = sha([...a.files.entries()].filter(([n]) => n.startsWith(`${base}/`)).sort(([x], [y]) => x.localeCompare(y)).map(([n, d]) => `${n}:${sha(d)}`).join("\n"));
   const existing = await db.course.findUnique({ where: { code: ov.code! } });
   const unchanged = existing?.sourceHash === courseHash;
 
@@ -205,10 +227,13 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
       const courseData = {
         slug: existing?.slug ?? slug,
         titleEn: ov.titleEn,
-        titleAr: ov.titleAr,
+        titleAr: arOv?.title || ov.titleAr,
         summaryEn: ov.description.split(/(?<=\.)\s/)[0] ?? null,
+        summaryAr: arOv?.description ? arOv.description.split(/(?<=[.؟!])\s/)[0] : null,
         descriptionEn: ov.description,
+        descriptionAr: arOv?.description || null,
         objectivesEn: ov.outcomes,
+        objectivesAr: arOv?.outcomes ?? [],
         durationMinutes: ov.durationMinutes,
         passMark: ov.passMark,
         language: ov.language,
@@ -233,8 +258,12 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
         const lessonSlug = p.file.replace(/\.md$/, "");
         const lessonData = {
           titleEn: l.titleEn,
-          titleAr: l.titleAr,
+          titleAr: p.ar?.titleEn || l.titleAr,
           bodyMd: l.bodyMd,
+          bodyMdAr: p.ar?.bodyMd ?? null,
+          objectivesAr: p.ar?.objectives ?? [],
+          videoScriptEn: p.video?.en ?? null,
+          videoScriptAr: p.video?.ar ?? null,
           objectives: l.objectives,
           prerequisites: l.prerequisites,
           durationMinutes: l.durationMinutes,
@@ -254,9 +283,11 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
         await tx.lesson.update({ where: { id: lesson.id }, data: { position: pos } });
 
         if (l.questions.length) {
-          const usable = l.questions.filter(isUsableQuestion);
+          const withAr = l.questions.map((q, i) => ({ q, ar: p.ar && p.ar.questions.length === l.questions.length && p.ar.questions[i].options.length === q.options.length ? p.ar.questions[i] : undefined }));
+          if (p.ar && p.ar.questions.length && !withAr.some((x) => x.ar)) report.warnings.push(`${ov.code}: "${l.titleEn}" Arabic quiz does not match the English structure; Arabic quiz text skipped`);
+          const usable = withAr.filter((x) => isUsableQuestion(x.q));
           const publish = usable.length >= MIN_PUBLISHABLE_QUESTIONS;
-          const qs = publish ? usable : l.questions;
+          const qs = publish ? usable : withAr;
           const status = publish ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
           if (publish) quizzesPublished++;
           else {
@@ -265,25 +296,25 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
           }
           const quiz = await tx.quiz.upsert({
             where: { lessonId: lesson.id },
-            update: { titleEn: `${l.titleEn} — Quiz`, passMark: ov.passMark, status },
-            create: { courseId: course.id, lessonId: lesson.id, titleEn: `${l.titleEn} — Quiz`, passMark: ov.passMark, status },
+            update: { titleEn: `${l.titleEn} — Quiz`, titleAr: p.ar?.titleEn ? `${p.ar.titleEn} — اختبار` : null, passMark: ov.passMark, status },
+            create: { courseId: course.id, lessonId: lesson.id, titleEn: `${l.titleEn} — Quiz`, titleAr: p.ar?.titleEn ? `${p.ar.titleEn} — اختبار` : null, passMark: ov.passMark, status },
           });
           await tx.quizQuestion.deleteMany({ where: { quizId: quiz.id } });
-          let qp = 0;
-          for (const q of qs) {
-            qp++;
-            const isTF = q.options.length === 2 && q.options.every((o) => /^(true|false)$/i.test(o.text));
-            await tx.quizQuestion.create({
-              data: {
-                quizId: quiz.id,
-                position: qp,
-                promptEn: q.prompt,
-                type: isTF ? QuestionType.TRUE_FALSE : q.options.filter((o) => o.isCorrect).length > 1 ? QuestionType.MULTIPLE_CHOICE : QuestionType.SINGLE_CHOICE,
-                options: { create: q.options.map((o, i) => ({ position: i + 1, textEn: o.text, isCorrect: o.isCorrect })) },
-              },
-            });
-          }
+          await createQuestions(tx, quiz.id, qs);
         }
+      }
+
+      // Final exam (course-level quiz, required for completion)
+      if (finalQs.length) {
+        const fx = finalQs.map((q, i) => ({ q, ar: finalArQs.length === finalQs.length && finalArQs[i].options.length === q.options.length ? finalArQs[i] : undefined }));
+        const usableFinal = fx.filter((x) => isUsableQuestion(x.q));
+        const status = usableFinal.length >= MIN_PUBLISHABLE_QUESTIONS ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
+        const existingFinal = await tx.quiz.findFirst({ where: { courseId: course.id, lessonId: null } });
+        const data = { titleEn: "Final exam", titleAr: "الاختبار النهائي", passMark: ov.passMark, status, required: true };
+        const quiz = existingFinal ? await tx.quiz.update({ where: { id: existingFinal.id }, data }) : await tx.quiz.create({ data: { ...data, courseId: course.id } });
+        await tx.quizQuestion.deleteMany({ where: { quizId: quiz.id } });
+        await createQuestions(tx, quiz.id, status === ContentStatus.PUBLISHED ? usableFinal : fx);
+        if (status === ContentStatus.PUBLISHED) quizzesPublished++; else quizzesDraft++;
       }
       // Remove lessons no longer present in the source (only those that came from this import).
       const codes = parsed.map((p) => p.lesson.code ?? `${ov.code}-${p.file.replace(/\.md$/, "")}`);
@@ -296,4 +327,23 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
   );
 
   report.courses.push({ code: ov.code!, slug: existing?.slug ?? slug, action: existing ? "updated" : "created", lessons: parsed.length, quizzesPublished, quizzesDraft });
+}
+
+type Tx = Prisma.TransactionClient;
+async function createQuestions(tx: Tx, quizId: string, qs: { q: ParsedQuestion; ar?: ParsedQuestion }[]) {
+  let qp = 0;
+  for (const { q, ar } of qs) {
+    qp++;
+    const isTF = q.options.length === 2 && q.options.every((o) => /^(true|false)$/i.test(o.text));
+    await tx.quizQuestion.create({
+      data: {
+        quizId,
+        position: qp,
+        promptEn: q.prompt,
+        promptAr: ar?.prompt ?? null,
+        type: isTF ? QuestionType.TRUE_FALSE : q.options.filter((o) => o.isCorrect).length > 1 ? QuestionType.MULTIPLE_CHOICE : QuestionType.SINGLE_CHOICE,
+        options: { create: q.options.map((o, i) => ({ position: i + 1, textEn: o.text, textAr: ar?.options[i]?.text ?? null, isCorrect: o.isCorrect })) },
+      },
+    });
+  }
 }

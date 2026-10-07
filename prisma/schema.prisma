@@ -288,7 +288,11 @@ model Lesson {
   slug            String
   titleEn         String
   titleAr         String?
-  bodyMd          String        @default("") // canonical Markdown source
+  bodyMd          String        @default("") // canonical Markdown source (English)
+  bodyMdAr        String?       // Arabic Markdown source
+  objectivesAr    String[]      @default([])
+  videoScriptEn   String?       // production script for the English video (admin only)
+  videoScriptAr   String?       // production script for the Arabic video (admin only)
   objectives      String[]      @default([])
   prerequisites   String?
   durationMinutes Int           @default(0)
@@ -343,6 +347,7 @@ model Video {
   provider    VideoProvider
   externalId  String?
   url         String
+  language    String        @default("all") // "en" | "ar" | "all"
   durationSec Int?
   thumbnail   String?
   captions    Json?

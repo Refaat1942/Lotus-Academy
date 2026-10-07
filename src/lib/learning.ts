@@ -89,7 +89,7 @@ export async function markLessonViewed(userId: string, lessonId: string) {
 async function checkpointPool(lessonId: string): Promise<PoolQuestion[]> {
   const qs = await db.quizQuestion.findMany({
     where: { quiz: { lessonId } }, orderBy: { position: "asc" },
-    select: { id: true, promptEn: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, isCorrect: true } } },
+    select: { id: true, promptEn: true, promptAr: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, textAr: true, isCorrect: true } } },
   });
   return buildCheckpointPool(qs);
 }
@@ -99,7 +99,7 @@ export interface CheckpointState {
   passed: boolean;
   attempts: number;
   /** Questions without the isCorrect flag (never sent to the browser). */
-  questions: { id: string; prompt: string; multi: boolean; options: { id: string; text: string }[] }[];
+  questions: { id: string; prompt: string; promptAr: string | null; multi: boolean; options: { id: string; text: string; textAr: string | null }[] }[];
 }
 
 /** Returns (drawing if needed) the learner's current checkpoint for a lesson. */
@@ -119,7 +119,7 @@ export async function getCheckpoint(userId: string, lessonId: string): Promise<C
   const byId = new Map(pool.map((q) => [q.id, q]));
   return {
     required: true, passed: false, attempts: row.attempts,
-    questions: row.questionIds.map((id) => byId.get(id)!).map((q) => ({ id: q.id, prompt: q.prompt, multi: q.options.filter((o) => o.isCorrect).length > 1, options: q.options.map((o) => ({ id: o.id, text: o.text })) })),
+    questions: row.questionIds.map((id) => byId.get(id)!).map((q) => ({ id: q.id, prompt: q.prompt, promptAr: q.promptAr ?? null, multi: q.options.filter((o) => o.isCorrect).length > 1, options: q.options.map((o) => ({ id: o.id, text: o.text, textAr: o.textAr ?? null })) })),
   };
 }
 
@@ -167,6 +167,14 @@ export async function submitQuiz(userId: string, quizId: string, submitted: Reco
   });
   if (!quiz) throw new Error("Quiz not available");
   await requireActiveEnrollment(userId, quiz.courseId);
+  if (!quiz.lessonId) {
+    // Final exam: every published lesson must be completed first.
+    const [total, done] = await Promise.all([
+      db.lesson.count({ where: publishedLessonsWhere(quiz.courseId) }),
+      db.lessonProgress.count({ where: { userId, courseId: quiz.courseId, completedAt: { not: null }, lesson: { status: "PUBLISHED", deletedAt: null } } }),
+    ]);
+    if (done < total) throw new Error("Complete all lessons before the final exam");
+  }
   const graded = gradeQuiz(quiz.questions, submitted, quiz.passMark);
   // Serialize per user+quiz so concurrent submissions cannot exceed maxAttempts.
   const attempt = await db.$transaction(async (tx) => {

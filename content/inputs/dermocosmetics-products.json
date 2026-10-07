@@ -1,0 +1,807 @@
+[
+ {
+  "sheet": "bioderm",
+  "rows": [
+   {
+    "name": "Bioderma",
+    "usage_ar": null
+   },
+   {
+    "name": "Dry skin",
+    "usage_ar": null
+   },
+   {
+    "name": "Atoderm P.p",
+    "usage_ar": "للتجاعيد الناتجة عن جفاف الجلد \" مع تقدم العمر \""
+   },
+   {
+    "name": "Atoderm Cream",
+    "usage_ar": "مرطب يومي للبشرة الجافة والعادية \"ليل\" \" للوجه والجسم \" لا يسد المسام"
+   },
+   {
+    "name": "Atoderm Po Zinc",
+    "usage_ar": "كريم للالتهابات .. خالى من الكورتيزون .. علاج التهابات الحفاضات (للاطفال)"
+   },
+   {
+    "name": "Atoderm Soap",
+    "usage_ar": "صابون للبشرة الجافة \" مستخلص الخيار والجلسرين \""
+   },
+   {
+    "name": "Atoderm Milk",
+    "usage_ar": "\"نهار\" ... لا يسبب ملمس دهنى  Lotion للبشرة الجافة يستخدم علي الاماكن الواسعة"
+   },
+   {
+    "name": "Atoderm Mossant",
+    "usage_ar": "جل غسول للبشره الجافه \"خال من العطور \""
+   },
+   {
+    "name": "Sun Screen",
+    "usage_ar": null
+   },
+   {
+    "name": "Photoderm w/o serum",
+    "usage_ar": "كريم لتفتيح البقع الغامقة ليل"
+   },
+   {
+    "name": "Photoderm w/o cream",
+    "usage_ar": "كريم لتفتيح البقع الغامقة نهار"
+   },
+   {
+    "name": "Photoderm Milk",
+    "usage_ar": "كريم للاماكن الواسعة"
+   },
+   {
+    "name": "Photoderm Spot",
+    "usage_ar": "بعد عمليات التقشير والليزر"
+   },
+   {
+    "name": "Photoderm Cream",
+    "usage_ar": "للبشرة العادية او الجافة"
+   },
+   {
+    "name": "Photoderm Tinted",
+    "usage_ar": "يستخدم ككريم اساس للبشرة الغامقة"
+   },
+   {
+    "name": "Photoderm Light Tinted",
+    "usage_ar": "يستخدم ككريم اساس للبشرة الفاتحة"
+   },
+   {
+    "name": "Photoderm Fluid",
+    "usage_ar": "يستخدم للبشرة الدهنية _من غير لون"
+   },
+   {
+    "name": "Photoderm Kids",
+    "usage_ar": "للاطفال"
+   },
+   {
+    "name": "Photoderm spray",
+    "usage_ar": "للبشرة العادية"
+   },
+   {
+    "name": "Sensebio",
+    "usage_ar": "senstive skin"
+   },
+   {
+    "name": "Sensebio cream",
+    "usage_ar": null
+   },
+   {
+    "name": "Sensebio fort",
+    "usage_ar": "لالتهابات البشرة الحساسة"
+   },
+   {
+    "name": "Sensebio H2o",
+    "usage_ar": "مياة منظفة للبشرة الحساسة"
+   },
+   {
+    "name": "Sensebio Rich cream",
+    "usage_ar": "كريم ليل للبشرة الحساسة"
+   },
+   {
+    "name": "Sensebio Light cream",
+    "usage_ar": "كريم نهار للبشرة الحساسة"
+   },
+   {
+    "name": "Sensebio eye countor",
+    "usage_ar": "لالتهابات حول العين للبشرة الحساسة"
+   },
+   {
+    "name": "Sensebio Cleansing",
+    "usage_ar": "منظف للبشرة الحساسة"
+   },
+   {
+    "name": "Sensebio mask",
+    "usage_ar": "يستخدم ككريم مغذي للبشرة الحساسة"
+   },
+   {
+    "name": "Node Ds+",
+    "usage_ar": "شامبو للقشره"
+   },
+   {
+    "name": "sebium",
+    "usage_ar": "oily skin"
+   },
+   {
+    "name": "sebium Akn",
+    "usage_ar": "كريم لعلاج حب الشباب وازاله الرؤوس السوداء والبيضاء ويقلل ظهور البقع"
+   },
+   {
+    "name": "Sebium H2o",
+    "usage_ar": "غسول منظف للبشرة الدهنية يستخدم كمزيل للمكياج"
+   },
+   {
+    "name": "Sebium Exfoliating",
+    "usage_ar": "منظف عميق للبشرة الدهنية يستخدم مرتان اسبوعيا يحتوي عل حبيبات لصنفرة البشرة"
+   },
+   {
+    "name": "Sebium Mossuant",
+    "usage_ar": "غسول منظف للبشرة الدهنية يستخدم لمنع الالتهابات"
+   },
+   {
+    "name": "Sebium Ai",
+    "usage_ar": "يسرع ازاله الحبوب الملتهبه / يقلل من الاصابه بالحبوب/ يرطب ويلطف"
+   },
+   {
+    "name": "Ciacbio",
+    "usage_ar": "التئام الجروح / علاج الحروق"
+   },
+   {
+    "name": "sebium pore refiner",
+    "usage_ar": "علاج المسامات المفتوحه/ يضيق المسامات المفتوحه/ يقلل لمعان البشره/ يحسن ملمس البشره"
+   },
+   {
+    "name": "Sebium Soap",
+    "usage_ar": "صابونه للبشره الحساسه"
+   }
+  ]
+ },
+ {
+  "sheet": "uriage",
+  "rows": [
+   {
+    "name": "Uriage",
+    "usage_ar": null
+   },
+   {
+    "name": "Thermal Water",
+    "usage_ar": "تستخدم كمرطب و ملطف للجلد وتساعد فى علاج التهابات البشره"
+   },
+   {
+    "name": "منتجات العنايه بالبشره الجافه",
+    "usage_ar": null
+   },
+   {
+    "name": "Bariederm Cream 75 ml",
+    "usage_ar": "كريم عازل للسيدات اثناء العمل المنزلى والتهابات حفاضات للاطفال / علاج ووقايه من الاكزيما"
+   },
+   {
+    "name": "Xemose",
+    "usage_ar": "علاج حالات الاكزيما وجفاف البشره الشديد للوجه والجسم"
+   },
+   {
+    "name": "Emollient Extreame 200 ml",
+    "usage_ar": "مرطب قوي لحالات الجفاف الشديد للبشره الخفيفه والمتوسطه للوجه والجسم"
+   },
+   {
+    "name": "Emollient Cream 150 ml",
+    "usage_ar": "مرطب يومي عادي"
+   },
+   {
+    "name": "منتجات لعلاج التجاعيد ومشاكل منطقه حول العين",
+    "usage_ar": null
+   },
+   {
+    "name": "Isolift visage",
+    "usage_ar": "كريم التجاعيد للوجه والرقبه ابتداء من عمر 30"
+   },
+   {
+    "name": "Isolift eye",
+    "usage_ar": "لعلاج التجاعيد حول منطقة العين والهالات السوداء وانتفاخات العين \"امن \""
+   },
+   {
+    "name": "Isoval cream",
+    "usage_ar": "لعلاج التجاعيد (فوق سن ال40 ) الوجه والرقبه"
+   },
+   {
+    "name": "منتجات تفتيح البشره الغامقه والبقع السمراء",
+    "usage_ar": null
+   },
+   {
+    "name": "Depiderm cream",
+    "usage_ar": "كريم لتفتيح البقع الغامقة و اسمرار الجلد للمناطق الحساسه ( تحت الابط و بين الفخدين) \" ليلا\""
+   },
+   {
+    "name": "depiderm Spf 50",
+    "usage_ar": "كريم تفتيح وحماية يستخدم نهارا"
+   },
+   {
+    "name": "منتجات العنايه بالبشره الدهنيه وعلاج حب الشباب",
+    "usage_ar": null
+   },
+   {
+    "name": "Hyseac Active cream",
+    "usage_ar": "علاج لحب الشباب بدون التهابات او احمرار ف الوجه"
+   },
+   {
+    "name": "Hyseac gel",
+    "usage_ar": "غسول لافراز الدهون للبشره الدهنيه او قبل وضع علاج لحب الشباب"
+   },
+   {
+    "name": "Hyseac AI",
+    "usage_ar": "يسرع ازاله الحبوب الملتهبه / يقلل من الاصابه بالحبوب/ يرطب ويلطف \" مرتان فى اليوم \""
+   },
+   {
+    "name": "Hyseac restructrant",
+    "usage_ar": "مرطب و كلطف للبشره الدهنيه والمتأثره من علاج حب الشباب \"مرتان فى اليوم \""
+   },
+   {
+    "name": "منتجات الحمايه من الشمس",
+    "usage_ar": null
+   },
+   {
+    "name": "Uriage Barie sun Cream",
+    "usage_ar": "مناسب للوجه واليدين وكل انواع البشره"
+   },
+   {
+    "name": "Uriage Barie sun Milk",
+    "usage_ar": "لوشن للاماكن الواسعة"
+   },
+   {
+    "name": "Uriage Barie sun tinted\"dore\"",
+    "usage_ar": "كريم اساس للبشره الغامقه"
+   },
+   {
+    "name": "UriageBarie sun light tinted\"clair\"",
+    "usage_ar": "كريم اساس للبشره الفاتحه"
+   },
+   {
+    "name": "Uriage mineral",
+    "usage_ar": "للبشره الحساسه جدا أمن للسيدات الحوامل والرضاعه"
+   },
+   {
+    "name": "Uriage Extreme 90+",
+    "usage_ar": "للبشره العاديه و الجافه يستخدم ككريم اساس"
+   },
+   {
+    "name": "Uriage Barie sun Kids milk",
+    "usage_ar": "كريم للاطفال"
+   },
+   {
+    "name": "Cu Zn 75 /40 ml",
+    "usage_ar": "كريم للالتهابات"
+   },
+   {
+    "name": "Cu Zn gel",
+    "usage_ar": "منظف"
+   },
+   {
+    "name": "Cicactive",
+    "usage_ar": "جل لالتئام الجروح والحروق"
+   }
+  ]
+ },
+ {
+  "sheet": "Foltent",
+  "rows": [
+   {
+    "name": "اصناف FOLTENE",
+    "usage_ar": null
+   },
+   {
+    "name": "Shampoo Men 200 ml",
+    "usage_ar": "مغذي للشعر /  ويمنع تساقط الشعر"
+   },
+   {
+    "name": "Shampoo Women 200ml",
+    "usage_ar": "مغذي للشعر /  ويمنع تساقط الشعر"
+   },
+   {
+    "name": "shampoo Anti Dandruff",
+    "usage_ar": "شامبو ضد القشرة"
+   },
+   {
+    "name": "Treatment Anti Dandruff",
+    "usage_ar": "امبولات ضد القشرة"
+   },
+   {
+    "name": "Treatment Men 100 ml",
+    "usage_ar": "امبولات بها مادة تمنع تساقط الشعر"
+   },
+   {
+    "name": "Treatment Women 100 ml",
+    "usage_ar": "امبولات بها مادة تمنع تساقط الشعر"
+   },
+   {
+    "name": "Eyelash  Treatment",
+    "usage_ar": "مسكرة لتقوية وعلاج الرموش"
+   },
+   {
+    "name": "Folten Conditionr",
+    "usage_ar": "بلسم"
+   },
+   {
+    "name": "Nail treatment",
+    "usage_ar": "مقوى الاظافر"
+   }
+  ]
+ },
+ {
+  "sheet": "Avene",
+  "rows": [
+   {
+    "name": "اصناف شركـــة AVENE",
+    "usage_ar": null
+   },
+   {
+    "name": "Akerat Cream 200 ml",
+    "usage_ar": "مرطب لبشرة شديدة الجفاف التي تعاني من قشور"
+   },
+   {
+    "name": "Cleanance gel 200 ml",
+    "usage_ar": "غسول يومي للبشرة الدهنية"
+   },
+   {
+    "name": "Clean AC 40 ml",
+    "usage_ar": "المرطب الوحيد للبشرة الدهنية"
+   },
+   {
+    "name": "Cleanance K",
+    "usage_ar": "مقشر الرؤوس السوداء"
+   },
+   {
+    "name": "Cold Cream For Hands",
+    "usage_ar": "مرطب قوي لتشققات الايدي والكعبين"
+   },
+   {
+    "name": "Cold Cream 100 ml",
+    "usage_ar": "مرطب قوي للبشرة الجافة"
+   },
+   {
+    "name": "Diacneal cream 30 ml",
+    "usage_ar": "كريم لجميع انواع حب الشباب في المراحل المتقدمة والمتوسطة"
+   },
+   {
+    "name": "Extreme Sunblock Cream SPF 50 50 ml",
+    "usage_ar": "واقي من الشمس بعد الليزر والتقشير الكميائي والبشرة الحساسة والاطفال"
+   },
+   {
+    "name": "50+Extreme Sunblock Cream SPF 50+50 ml",
+    "usage_ar": "واقي من الشمس للبشرة الجافة"
+   },
+   {
+    "name": "Emulsion 50 +50 ml",
+    "usage_ar": "واقي من الشمس للبشرة الدهنية والعادية"
+   },
+   {
+    "name": "Extreme Sunblock Tinted SPF 50+50ml",
+    "usage_ar": "واقي من الشمس لجميع انواع البشرة"
+   },
+   {
+    "name": "Gentle Exfoliating Scrub",
+    "usage_ar": "صنفرة لجميع انواع البشرة لازالة الخلايا الميتة"
+   },
+   {
+    "name": "Gentle Milk Cleanser 200 ml",
+    "usage_ar": "منظف للبشرة الجافة ومزيل للمكياج"
+   },
+   {
+    "name": "Moisturizing Soothing Mask 50 ml",
+    "usage_ar": "قناع ترطيب لجميع انواع البشرة"
+   },
+   {
+    "name": "Rich Compensating Cream 40 ml",
+    "usage_ar": "مرطب يومي للبشرة الجافة وشديدة الجفاف"
+   },
+   {
+    "name": "Soothing Eye Contour Cream 10 ml",
+    "usage_ar": "للانتفاخات والحمرار والاحتقان لمحيط العين"
+   },
+   {
+    "name": "Thermal Spring Water 150 ml",
+    "usage_ar": "ملطف ومضاد للالتهابات والاحمرار والحكة وللترطيب من الشمس والحروق من الدرجة الاولي"
+   },
+   {
+    "name": "Thermal Spring Water 300 ml",
+    "usage_ar": null
+   },
+   {
+    "name": "Tinted Extreme Compact Cream SPF 50 50 ml",
+    "usage_ar": "واقي من الشمس علي هيئة كريم اساس بعد عمليات اليزر والتقشير"
+   },
+   {
+    "name": "Trixera Cream",
+    "usage_ar": "مرطب للبشرة الجافة والتي تعاني من الحساسية"
+   },
+   {
+    "name": "TT Sunblock Milk 40 SPF",
+    "usage_ar": "واقي من الشمس لكل انواع البشرة"
+   },
+   {
+    "name": "Ultra Rish Cleansing BAR 100G",
+    "usage_ar": "صابون مخصص للبشرة الجافة"
+   },
+   {
+    "name": "Ystheal + Eye Contour 15 ml",
+    "usage_ar": "مضاد للتجاعيد لمحيط العينين"
+   },
+   {
+    "name": "Ystheal +Cream",
+    "usage_ar": "مضاد للتجاعيد للبشرة الجافة"
+   },
+   {
+    "name": "Ystheal +Emulsion",
+    "usage_ar": "مضاد للتجاعيد للبشرة الدهنية"
+   },
+   {
+    "name": "Cicalfate",
+    "usage_ar": "التئام الجروح"
+   },
+   {
+    "name": "Skin Recovery cream",
+    "usage_ar": null
+   },
+   {
+    "name": "Extreme Gentle cleanser",
+    "usage_ar": null
+   },
+   {
+    "name": "Eluage cream",
+    "usage_ar": "Anti wrinkle"
+   },
+   {
+    "name": "eluage eye contour",
+    "usage_ar": null
+   },
+   {
+    "name": "miceller lotion",
+    "usage_ar": "منظف لجميع انواع البشره ومزيل للماكياج"
+   }
+  ]
+ },
+ {
+  "sheet": "Isis",
+  "rows": [
+   {
+    "name": "اصناف شركـــة ISIS",
+    "usage_ar": null
+   },
+   {
+    "name": "Glyco. A",
+    "usage_ar": "كريم تقشير"
+   },
+   {
+    "name": "Teen derm gel",
+    "usage_ar": "غسول معالج للبشره الدهنيه يساعد على علاج حب الشباب ويخفف من لمعان الوجه والرؤوس السوداء"
+   },
+   {
+    "name": "Teen derm k",
+    "usage_ar": "علاج لحب الشباب"
+   },
+   {
+    "name": "Secalia AHA 200 ml",
+    "usage_ar": "مرطب لعلاج تشققات الكعب والبشره شديده الجفاف المتحرشفه مثل الكوع والركبه"
+   },
+   {
+    "name": "Secalia Balm 200 ml",
+    "usage_ar": "مرطب لعلاج البشره الجافه وشديده الجفاف (صالح للاطفال ويمكن وضعه على الشفاه) ويمكن استخدامه كلوشن للجسم"
+   },
+   {
+    "name": "Unitone cream",
+    "usage_ar": "كريم للتفتيح العام ويحافظ على البشره اللتهبه التى تعانى من الاحمرار ان تتحول بقع سمراء"
+   },
+   {
+    "name": "Unitone 4(15)ml",
+    "usage_ar": "2% hydrocanon"
+   },
+   {
+    "name": "Unitone 4(30)ml",
+    "usage_ar": "كريم تفتيح للبقع الصبغيه \"البقع بعد حب الشباب , الكلف, تفتيح الركبه ,الكوع\""
+   },
+   {
+    "name": "Unitone 4 Advanced",
+    "usage_ar": "يستخدم للتفتيح ليلا لاحتوائه على 4% hydrocanon"
+   },
+   {
+    "name": "Unitone 4 with Arbuten",
+    "usage_ar": "كريم تفتيح للاماكن الحساسه \"تحت الابط وبين الفخذين وحول الفم\""
+   },
+   {
+    "name": "Uveblock invisible",
+    "usage_ar": "sun screen spf 80 \"cream\""
+   },
+   {
+    "name": "Uveblock visable",
+    "usage_ar": null
+   },
+   {
+    "name": "Uveblock fluid",
+    "usage_ar": "sun screen spf 50+ \"fluid\""
+   },
+   {
+    "name": "Uveblock lightented",
+    "usage_ar": null
+   },
+   {
+    "name": "Vitiskin 50 ml",
+    "usage_ar": "لعلاج البهاق"
+   },
+   {
+    "name": "light eye",
+    "usage_ar": "للانتفاخات والهالات السوداء"
+   },
+   {
+    "name": "Nano pure",
+    "usage_ar": "يحتوى على  فيتامين سى بودر \"محتواه بودر \" بمجرد وضعه على الجلد يمتص \"لنضاره البشره \""
+   },
+   {
+    "name": "Nano Age",
+    "usage_ar": "يحتوى على هيدرونك اسد يساعد على تكوين الكولاجين لمنع التجاعيد"
+   },
+   {
+    "name": "Neotone",
+    "usage_ar": "تفتيح البقع السمراء ليلا \" arbutin , cream \""
+   }
+  ]
+ },
+ {
+  "sheet": "Asepta",
+  "rows": [
+   {
+    "name": "اصناف شركـــةAsepta",
+    "usage_ar": null
+   },
+   {
+    "name": "product",
+    "usage_ar": "usage"
+   },
+   {
+    "name": "Ecrinal Ampouls",
+    "usage_ar": "لكل حالات تساقط الشعر"
+   },
+   {
+    "name": "Ecrinal Lotion",
+    "usage_ar": "لكل حالات تساقط الشعر"
+   },
+   {
+    "name": "Ecrinal Shampoo",
+    "usage_ar": "خالى من المواد الكيمييائيه"
+   },
+   {
+    "name": "Ecrinal Mask",
+    "usage_ar": "حمام كريم للشعر التالف والمقصف"
+   },
+   {
+    "name": "Ecrinal Conditioner",
+    "usage_ar": "يستخدم بعد غسيل الشعر بالشامبو ليعطى نعومه ولمان للشعر"
+   },
+   {
+    "name": "Ecrinal Cream",
+    "usage_ar": "لحالات سقوط الشعر فى مناطق او بقع ف الراس"
+   },
+   {
+    "name": "Eyelash",
+    "usage_ar": "ماسكرا"
+   },
+   {
+    "name": "Nail strenghther",
+    "usage_ar": "مقوى للاظافر"
+   },
+   {
+    "name": "Nail Fortfying cream",
+    "usage_ar": "كريم لتتشققات لاظافر والزوائد الجلديه"
+   },
+   {
+    "name": "ملحوظه : فتره العلاج لحالات تساقط الشعر تحتاج الى 3 اشهر ويجب الا يتوقف المريض قبل هذه المده",
+    "usage_ar": null
+   },
+   {
+    "name": "ماده ال ANP : ماده طبيعيه مستخلصه من شعر عنق الحصان تساعد على زياده ماده الكيراتين التى تمثل 90 % من البروتين الموجود بداخل الشعر مما يمنعه من التساقط تماما",
+    "usage_ar": null
+   },
+   {
+    "name": "ويعيد نموه فى خلال شهرين فقط وهو امن فى فترات الحمل والرضاعه وللاطفال",
+    "usage_ar": null
+   }
+  ]
+ },
+ {
+  "sheet": "ducry",
+  "rows": [
+   {
+    "name": "DUCRAY",
+    "usage_ar": null
+   },
+   {
+    "name": "product",
+    "usage_ar": "usage"
+   },
+   {
+    "name": "Anastim",
+    "usage_ar": "امبولات لعلاج تساقط الشعر الناتج عن ضعف بصيله الشعر"
+   },
+   {
+    "name": "Kertoyl",
+    "usage_ar": "شامبو للصدفيه"
+   },
+   {
+    "name": "Kelual",
+    "usage_ar": "للقشره"
+   },
+   {
+    "name": "Argeal",
+    "usage_ar": "للشعر الدهنى - ينظم افرازات الدهون لذلك يمنع ظهور القشره"
+   },
+   {
+    "name": "Anaphase",
+    "usage_ar": "تساقط الشعر"
+   },
+   {
+    "name": "Nutriceret emulsion",
+    "usage_ar": "leave in conditioner....يعالج تقصف اطراف الشعر"
+   },
+   {
+    "name": "nutriceret shampoo",
+    "usage_ar": "شامبو لعلاج تقصف اطراف الشعر"
+   },
+   {
+    "name": "nutriceret Mask",
+    "usage_ar": "ماسك لعلاج تقصف الشعر وجفافه و يغذى الشعر"
+   },
+   {
+    "name": "elution shampoo",
+    "usage_ar": "يستخدم للذين يعانون من قشره كثيفه طوال فتره الشتاء لذلك يفضل استخدامه فى ال 3 شهور فتره الصيف للوقايه من قشره الشتاء - حامى من القشره والصدفيه"
+   },
+   {
+    "name": "Neoptide",
+    "usage_ar": "لعلاج تساقط الشعر المزمن لدى السيدات \" علبه بها 3 سبراى كل واحده 30 مل ل"
+   },
+   {
+    "name": "لعلاج تساقط الشعر المزمن لدى السيدات \"علبه بها 3 سبراى كل واحده 30 مل لمده 3 شهور \" مره واحده يوميا 1 مل = 12 رشه لمده شهريرش مساءا  على الشعر الناشف ويتم غسله بعدها بساعتين",
+    "usage_ar": null
+   }
+  ]
+ },
+ {
+  "sheet": "NUXE",
+  "rows": [
+   {
+    "name": "NUXE",
+    "usage_ar": null
+   },
+   {
+    "name": "3 Roses",
+    "usage_ar": "Nuxe Body"
+   },
+   {
+    "name": "Cleansing Water (100/200)ML",
+    "usage_ar": "منظف.مزيل مكياج.مرطب للوجه والعين"
+   },
+   {
+    "name": "Cleansing Milk (200)Ml",
+    "usage_ar": "منظف.مزيل مكياج.مرطب للوجه.البشره الجافه"
+   },
+   {
+    "name": "Cleansing Foam (150)Ml",
+    "usage_ar": "منظف.مزيل مكياج.مرطب عن طريق الرغوه"
+   },
+   {
+    "name": "Toning lotion(200)Ml",
+    "usage_ar": "قابض للمسام بعد عمليه التنظيف"
+   },
+   {
+    "name": "Gentle Aromatic Exfoliant(125)Ml",
+    "usage_ar": "صنفره للوجه3مرات اسبوعيا"
+   },
+   {
+    "name": "Gentle Purifying Mask (50)Ml",
+    "usage_ar": "ماسك تنظيف للبشره3مرات اسبوعيا"
+   },
+   {
+    "name": "Merveillane (25-35)",
+    "usage_ar": "Reve De Miel"
+   },
+   {
+    "name": "Cream (All Skin Types)(50)Ml",
+    "usage_ar": "كريم للخطوط التعبيريه لكل انواع البشره"
+   },
+   {
+    "name": "Enrichie Cream (Very Dry Skin)(50)Ml",
+    "usage_ar": "كريم للخطوط التعبيريه البشره شديده الجفاف"
+   },
+   {
+    "name": "Serum (All Skin Types)(30)Ml",
+    "usage_ar": "كريم للخطوط التعبيريه.الوجه.محيط العين.ليل ونهار.كل انواع البشره"
+   },
+   {
+    "name": "Fluid(50)Ml",
+    "usage_ar": "كريم للخطوط التعبيريه.البشره المختلطه و الدهنيه"
+   },
+   {
+    "name": "Aroma Vaillance (35-45)",
+    "usage_ar": "Hand&Nail (75)ML"
+   },
+   {
+    "name": "Cleansing gel (200)ML",
+    "usage_ar": "غسول للبشره الجافه والحساسه ومزيل مكياج"
+   },
+   {
+    "name": "Cream (Emultion)(50)Ml",
+    "usage_ar": "كريم لاعاده كثافه البشره العاديه والمختلطه"
+   },
+   {
+    "name": "Roll On(15)Ml",
+    "usage_ar": "قلم \" للجبهه و محيط العين و محيط الشفاه \""
+   },
+   {
+    "name": "Nuxuriance (45+)",
+    "usage_ar": "Aroma Perfection"
+   },
+   {
+    "name": "Day Cream (Normal&Dry)Skin(50)Ml",
+    "usage_ar": "كريم للتجاعيد العميقه بالوجه نهارا"
+   },
+   {
+    "name": "Day Cream.Emultion (Combination Skin)(50)Ml",
+    "usage_ar": "كريم للتجاعيد العميقه بالوجه نهارا"
+   },
+   {
+    "name": "Night (All Skin Types)(50)Ml",
+    "usage_ar": "كريم للتجاعيد العميقه بالوجه ليلا"
+   },
+   {
+    "name": "Serum Day/Night (All Skin Types)(30)Ml",
+    "usage_ar": "سيرم للتجاعيد العميقه بالوجه&ليلا&نهارا&محيط العين"
+   },
+   {
+    "name": "Eye And Lips(15)Ml",
+    "usage_ar": "سيرم للتجاعيد العميقه حول العين&الشفاه"
+   },
+   {
+    "name": "Prodigieuse",
+    "usage_ar": "Brightening Program"
+   },
+   {
+    "name": "Eye Cream(15)Ml",
+    "usage_ar": "كريم مضاد للاجهاد والانتفاخات والتجاعيد والهالات السوداء"
+   },
+   {
+    "name": "Day Cream(40)Ml",
+    "usage_ar": "كريم نهارا مضاد للاجهاد وتعب البشره"
+   },
+   {
+    "name": "Night Cream(40)Ml",
+    "usage_ar": "كريم ليلا مضاد للاجهاد وتعب البشره وتجديدها"
+   },
+   {
+    "name": "Huile prodigieuse",
+    "usage_ar": "UV Protector (30)ML"
+   },
+   {
+    "name": "Masque Frais Hydratant (50)ML",
+    "usage_ar": null
+   },
+   {
+    "name": "Dry Oil (100/50 ML)",
+    "usage_ar": "زيت جاف \"للوجه&للشعر&للجسم\"للترطيب.تغذيه.مقاومه التجاعيد"
+   },
+   {
+    "name": "Dry Oil Golden Shimmer (100/50 ML)",
+    "usage_ar": "زيت جاف برونزى \"للوجه&للشعر&للجسم\"للترطيب.تغذيه.مقاومه التجاعيد"
+   }
+  ]
+ },
+ {
+  "sheet": "a. c. m",
+  "rows": [
+   {
+    "name": "depiwhite cream advanced",
+    "usage_ar": "يستخدم لعلاج التصبغات الجلديه وتفتيح للون البشره .يستخدم مره مساء علي مكان البقع"
+   },
+   {
+    "name": "depiwhite cream spf50",
+    "usage_ar": "كزيم نهاري لتفتيح اليشره وتوحيد للونها وعلاج الكلف والتصبغات يستخدم كل 4ساعات"
+   }
+  ]
+ }
+]

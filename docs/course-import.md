@@ -15,3 +15,25 @@ parse overview/lessons (IDs, duration, objectives, body, embedded quiz) → upse
   *Admin → Quizzes* (publishing is blocked until each question has ≥2 options and a correct answer).
 * Re-import overwrites imported fields of changed courses/lessons (source of truth = archive); lessons absent from a changed archive are archived.
 * Course 06 does not exist in the supplied sources; `Course-07-pediatrics (1).zip` was not received (only one pediatrics archive was uploaded).
+
+
+## Bilingual authored courses (EN + AR) — `content/courses-src/`
+New courses are authored as Markdown folders (format: `content/courses-src/_FORMAT.md`) and packed into the same ZIP pipeline:
+
+```bash
+npx tsx scripts/validate-course.ts content/courses-src/09-selling-skills   # structure, 10 Q/lesson, 20-Q final exam, EN/AR parity, no personal names
+npm run pack:courses                                                        # -> content/sources/Course-NN-slug.zip
+npm run import:courses                                                      # idempotent import (also runs on container start)
+```
+Per lesson: `lesson-NN.md` (English + quiz), `lesson-NN.ar.md` (Arabic + same quiz), `lesson-NN.video.md` (English/Arabic video scripts,
+admin-only). Per course: `course-overview(.ar).md`, `final-exam(.ar).md` (course-level required quiz, unlocked after all lessons).
+Arabic text is shown when the learner's language is Arabic (lessons, objectives, quizzes, checkpoint, course info); English is the fallback.
+
+To add a course: drop a new numbered folder (or upload a ZIP with the same layout under `content/sources/`), validate, pack, import.
+Product facts for dermocosmetics courses come from `content/inputs/dermocosmetics-products.json` (extracted from the Lotus product sheet);
+items the authors could not verify are listed in each course's `AUTHOR_NOTES.md` (not imported) for the Lotus team to confirm.
+
+## Videos
+The platform stores videos per lesson and per language (Arabic / English / both): admin → lesson → Videos (YouTube, Vimeo or HTTPS file URL).
+Video *production* is outside the platform: each lesson ships a recording script (`.video.md`) in both languages, visible in admin → lesson →
+"Video production scripts". Upload/record the videos, then attach the links.

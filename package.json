@@ -15,7 +15,9 @@
     "create:admin": "tsx scripts/create-admin.ts",
     "test:int": "vitest run --config vitest.int.config.ts",
     "test:e2e": "playwright test",
-    "test:all": "vitest run && bash scripts/test-db.sh && vitest run --config vitest.int.config.ts && playwright test"
+    "test:all": "vitest run && bash scripts/test-db.sh && vitest run --config vitest.int.config.ts && playwright test",
+    "pack:courses": "tsx scripts/pack-courses.ts",
+    "validate:course": "tsx scripts/validate-course.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
