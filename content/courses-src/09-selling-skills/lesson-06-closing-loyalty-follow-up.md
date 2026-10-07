@@ -154,15 +154,15 @@ A customer in his sixties has just started a new regular medicine for blood pres
 
 **Q2.** Which is a sign that the customer is ready to buy?
 - a) The customer checks his phone
-- b) The customer asks about the daily use, the pack size or the monthly cost
+- b) The customer asks about the daily use, the pack size or the monthly cost ✓
 - c) The customer asks to leave
 - d) The customer asks about a different product category
 
 **Q3.** After the customer has decided, what should you do?
 - a) Continue explaining all the features again
-- b) Stop explaining, confirm the details and close the sale ✓
-- c) Offer three more products
-- d) Ask the customer to come back later
+- b) Offer three more products
+- c) Ask the customer to come back later
+- d) Stop explaining, confirm the details and close the sale ✓
 
 **Q4.** Which should be included in the closing checklist?
 - a) One safety reminder and a "see a doctor if" trigger, plus clear instructions ✓
@@ -177,8 +177,8 @@ A customer in his sixties has just started a new regular medicine for blood pres
 - d) Skip the explanation
 
 **Q6.** Why do you ask for consent before collecting customer details or sending WhatsApp messages?
-- a) To build a promotional list
-- b) To respect privacy and keep health information confidential ✓
+- a) To respect privacy and keep health information confidential ✓
+- b) To build a promotional list
 - c) Because the customer will otherwise refuse to pay
 - d) It is not necessary
 

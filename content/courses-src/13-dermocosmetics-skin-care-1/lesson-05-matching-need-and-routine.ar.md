@@ -71,7 +71,7 @@
 | بشرة غامقة مع حاجة للون | Photoderm Tinted؛ Uriage Barie sun tinted "dore" |
 | بشرة فاتحة مع حاجة للون | Photoderm Light Tinted؛ Uriage Barie sun light tinted "clair" |
 | مساحات الجسم الكبيرة | Photoderm Milk؛ Uriage Barie sun Milk؛ Avène TT Sunblock Milk |
-| الوجه واليدان لأي بشرة | Uriage Barie sun Cream؛ Avène Extreme Sunblock Tinted |
+| الوجه واليدان لأي بشرة | Uriage Barie sun Cream؛ Avène Extreme Sunblock Tinted (مذكور لكل أنواع البشرة) |
 
 ## 4. بناء روتين بسيط
 

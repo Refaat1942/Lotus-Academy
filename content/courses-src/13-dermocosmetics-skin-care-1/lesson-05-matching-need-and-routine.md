@@ -82,7 +82,7 @@ All three brands cover the same needs. The Lotus sheet gives usage notes for eac
 | Dark skin with colour need | Photoderm Tinted; Uriage Barie sun tinted "dore" |
 | Light skin with colour need | Photoderm Light Tinted; Uriage Barie sun light tinted "clair" |
 | Large body areas | Photoderm Milk; Uriage Barie sun Milk; Avène TT Sunblock Milk |
-| Face and hands, any skin | Uriage Barie sun Cream; Avène Extreme Sunblock Tinted |
+| Face and hands, any skin | Uriage Barie sun Cream; Avène Extreme Sunblock Tinted (listed for all skin types) |
 
 ## 4. Building a simple routine
 
