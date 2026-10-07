@@ -3,8 +3,12 @@ import path from "path";
 import { parseExam, parseLesson, parseOverview, parseOverviewAr, parseVideoScript } from "./parse";
 
 const words = (s: string) => (s.match(/[\p{L}\p{N}]+/gu) ?? []).length;
-const NAME_HINTS = /\b(Dr|Mr|Mrs|Ms|Prof)\.?\s+[A-Z][a-z]+|(?:د\.|الدكتور|الدكتورة|السيد|السيدة|الأستاذ|الاستاذ|الأستاذة)\s+[\p{L}]{2,}/u;
-const COMMON_NAMES = /\b(Ahmed|Ahmad|Mohamed|Mohammed|Muhammad|Mahmoud|Mostafa|Mustafa|Sara|Sarah|Fatma|Fatima|Mona|Hassan|Hussein|Ali|Mariam|Maryam|Nour|Omar|Khaled|Youssef|Yusuf|Hany|Hoda|Samir|Amr|Tarek|Layla|Laila|Salma|Heba|Dina|Rania|John|Mary|David|Michael)\b|(?<![\p{L}])(أحمد|محمد|محمود|مصطفى|سارة|فاطمة|منى|حسن|حسين|علي|مريم|نور|عمر|خالد|يوسف|هاني|هدى|سمير|عمرو|طارق|ليلى|سلمى|هبة|دينا|رانيا)(?![\p{L}])/u;
+// Names that cannot be confused with ordinary Arabic/English words (ambiguous ones such as عمر "age", علي, نور, حسن, هدى are deliberately excluded).
+const AR_NAMES = "أحمد|محمد|محمود|مصطفى|سارة|فاطمة|خالد|يوسف|هاني|سمير|طارق|رانيا|عمرو|مريم|ليلى";
+const EN_NAMES = "Ahmed|Ahmad|Mohamed|Mohammed|Muhammad|Mahmoud|Mostafa|Mustafa|Sara|Sarah|Fatma|Fatima|Mona|Hassan|Hussein|Mariam|Maryam|Omar|Khaled|Youssef|Yusuf|Hany|Hoda|Samir|Amr|Tarek|Layla|Laila|Salma|Heba|Dina|Rania|John|Mary|David|Michael";
+// A title is only suspicious when followed by an actual name (Latin capitalised word or a known Arabic name); "د." must be a standalone token.
+const NAME_HINTS = new RegExp(`\\b(?:Dr|Mr|Mrs|Ms|Prof)\\.?\\s+[A-Z][a-z]+|(?<![\\p{L}])د\\.\\s+(?:${AR_NAMES}|[A-Za-z]{2,})|(?:الدكتور|الدكتورة|السيد|السيدة|الأستاذ|الاستاذ|الأستاذة)\\s+(?:${AR_NAMES})(?![\\p{L}])`, "u");
+const COMMON_NAMES = new RegExp(`\\b(?:${EN_NAMES})\\b|(?<![\\p{L}])(?:${AR_NAMES})(?![\\p{L}])`, "u");
 
 export interface ValidationResult { errors: string[]; warnings: string[]; stats: { lessons: number; questions: number; words: number } }
 

@@ -26,8 +26,8 @@ test.describe.serial("Arabic lessons and final exam", () => {
   }
 
   test("lesson renders in Arabic RTL with Arabic objectives and copyright note", async ({ page, context }) => {
+    await login(page); // log in with the English UI, then switch to Arabic
     await context.addCookies([{ name: "la_locale", value: "ar", url: "http://localhost:15170" }]);
-    await login(page);
     const c = await db.course.findUniqueOrThrow({ where: { code: CODE }, include: { lessons: { orderBy: { position: "asc" } } } });
     const l = c.lessons[0];
     expect(l.bodyMdAr).toBeTruthy();

@@ -8,7 +8,10 @@ import { detectDuplicates, readArchive } from "./run";
 import { isUsableQuestion, parseLesson, parseOverview, parseQuiz } from "./parse";
 
 const SRC = path.resolve(__dirname, "../../../content/sources");
-const archives = fs.readdirSync(SRC).filter((f) => f.endsWith(".zip")).sort().map((f) => readArchive(path.join(SRC, f)));
+const all = fs.readdirSync(SRC).filter((f) => f.endsWith(".zip")).sort();
+// Original uploaded curriculum (courses 01-08) vs. the bilingual authored courses (09+).
+const archives = all.filter((f) => /^Course-0[1-8]-/.test(f)).map((f) => readArchive(path.join(SRC, f)));
+const authored = all.filter((f) => /^Course-(09|1\d)-/.test(f)).map((f) => readArchive(path.join(SRC, f)));
 
 describe("importer: source archives", () => {
   it("reads all 7 distinct course archives", () => {
@@ -32,6 +35,20 @@ describe("importer: source archives", () => {
       expect(l.durationMinutes, n).toBeGreaterThan(0);
       expect(l.objectives.length, n).toBeGreaterThan(0);
       expect(l.bodyMd, n).not.toMatch(/Lesson Quiz/);
+    }
+  });
+});
+
+describe("importer: bilingual authored courses", () => {
+  it("has 7 packed courses, each with Arabic overview, exams, and per-lesson Arabic + video scripts", () => {
+    expect(authored.map((a) => a.courseCode)).toEqual(["EG-RET-01", "EG-COM-01", "EG-RET-02", "EG-RET-03", "EG-DRM-01", "EG-DRM-02", "EG-DRM-03"]);
+    for (const a of authored) {
+      const names = [...a.files.keys()].map((n) => n.split("/").slice(2).join("/"));
+      expect(names, a.fileName).toEqual(expect.arrayContaining(["course-overview.md", "course-overview.ar.md", "final-exam.md", "final-exam.ar.md"]));
+      const lessons = names.filter((n) => /^lesson-[\w-]+\.md$/.test(n) && !/\.(ar|video)\.md$/.test(n));
+      expect(lessons.length, a.fileName).toBeGreaterThanOrEqual(5);
+      for (const l of lessons) { expect(names).toContain(l.replace(/\.md$/, ".ar.md")); expect(names).toContain(l.replace(/\.md$/, ".video.md")); }
+      expect(names.some((n) => /AUTHOR_NOTES/i.test(n)), "author notes must not ship in the archive").toBe(false);
     }
   });
 });
