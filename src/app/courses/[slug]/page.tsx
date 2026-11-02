@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { enrollAction } from "@/app/actions/learning";
 import { Badge, Progress, fmtDuration } from "@/components/ui";
 import { CourseCard } from "@/components/CourseCard";
+import { visibleCoursesWhere, audienceOf, canSeeCourse } from "@/lib/audience";
 import { listCourses } from "@/lib/catalog";
 import { resumeLesson } from "@/lib/domain";
 import { themeVars } from "@/lib/category-theme";
@@ -39,13 +40,14 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const course = await load(slug);
   if (!course) notFound();
   const user = await getCurrentUser();
+  if (course.visibility === "AUDIENCE" && !(await canSeeCourse(user, course.id))) notFound(); // targeted course, not for this viewer
   const enrollment = user ? await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null;
   const enrolled = !!enrollment && enrollment.status !== "CANCELLED";
   const finalQuiz = await db.quiz.findFirst({ where: { courseId: course.id, lessonId: null, status: "PUBLISHED" }, select: { id: true, passMark: true, _count: { select: { questions: true } }, attempts: user ? { where: { userId: user.id, passed: true }, select: { id: true }, take: 1 } : false } });
   const [progress, done, related] = await Promise.all([
     user ? db.courseProgress.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null,
     user ? db.lessonProgress.findMany({ where: { userId: user.id, courseId: course.id, completedAt: { not: null } }, select: { lessonId: true } }) : [],
-    listCourses({ category: course.category?.slug }),
+    listCourses({ category: course.category?.slug, visible: visibleCoursesWhere(user, await audienceOf(user?.id)) }),
   ]);
   const lessons = course.modules.flatMap((m) => m.lessons);
   const doneSet = new Set(done.map((d) => d.lessonId));

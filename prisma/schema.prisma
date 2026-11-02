@@ -75,11 +75,17 @@ model User {
   failedLogins     Int           @default(0)
   lockedUntil      DateTime?
   avatarUrl        String?
+  audienceId       String?       // job role / learning track (pharmacist, branch manager, ...)
+  branch           String?
+  area             String?
+  department       String?
+  mustChangePassword Boolean     @default(false)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   deletedAt        DateTime?
 
   roles            UserRole[]
+  audience         Audience?     @relation(fields: [audienceId], references: [id], onDelete: SetNull)
   sessions         Session[]
   authTokens       AuthToken[]
   studentProfile   StudentProfile?
@@ -97,6 +103,7 @@ model User {
 
   @@index([status])
   @@index([createdAt])
+  @@index([audienceId])
 }
 
 model Role {
@@ -229,6 +236,7 @@ model Course {
   sortOrder        Int           @default(0)
   categoryId       String?
   sequential       Boolean       @default(true) // lessons unlock one after another
+  visibility       CourseVisibility @default(ALL)
   priceCents       Int           @default(0) // extension point: paid courses
   currency         String        @default("EGP")
   publishedAt      DateTime?
@@ -250,6 +258,7 @@ model Course {
   certificates Certificate[]
   tags        CourseTag[]
   quizzes     Quiz[]
+  audiences   CourseAudience[]
 
   @@index([status, publishedAt])
   @@index([categoryId])
@@ -322,6 +331,11 @@ model Lesson {
   @@index([moduleId, position])
 }
 
+enum CourseVisibility {
+  ALL       // every learner (and the public catalogue)
+  AUDIENCE  // only learners whose job role (audience) is targeted
+}
+
 enum AssetKind {
   FILE
   LINK
@@ -366,7 +380,8 @@ model Enrollment {
   enrolledAt  DateTime         @default(now())
   completedAt DateTime?
   lastLessonId String?
-  source      String           @default("self") // extension: promo/org/payment
+  source      String           @default("self") // "self" | "assigned" | extension: promo/org/payment
+  dueAt       DateTime?        // set for mandatory (assigned) training
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   @@unique([userId, courseId])
@@ -618,4 +633,28 @@ model ChatMessage {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, courseId, createdAt])
+}
+
+/** Job role / learning track. Courses are targeted to audiences and can be mandatory for them. */
+model Audience {
+  id        String           @id @default(cuid())
+  key       String           @unique
+  nameEn    String
+  nameAr    String
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  users     User[]
+  courses   CourseAudience[]
+}
+
+model CourseAudience {
+  courseId   String
+  audienceId String
+  required   Boolean  @default(false) // mandatory: learners of this audience are auto-enrolled
+  dueDays    Int?     // days to complete after assignment
+  createdAt  DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  audience   Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  @@id([courseId, audienceId])
+  @@index([audienceId])
 }

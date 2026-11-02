@@ -1,12 +1,12 @@
 import { getCurrentUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { coursePerformance, parseRange, toCsv } from "@/lib/reports";
+import { complianceRows, coursePerformance, parseRange, toCsv } from "@/lib/reports";
 import type { PermissionKey } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-const NEEDS: Record<string, PermissionKey> = { users: "users.read", enrollments: "enrollments.read", courses: "reports.read", certificates: "certificates.read", emails: "emails.read", audit: "audit.read", quizzes: "reports.read" };
+const NEEDS: Record<string, PermissionKey> = { users: "users.read", enrollments: "enrollments.read", courses: "reports.read", certificates: "certificates.read", emails: "emails.read", audit: "audit.read", quizzes: "reports.read", compliance: "reports.read" };
 
 export async function GET(req: Request, { params }: { params: Promise<{ type: string }> }) {
   const { type } = await params;
@@ -33,6 +33,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ type: st
   } else if (type === "emails") {
     const es = await db.emailLog.findMany({ where: { createdAt: r }, orderBy: { createdAt: "desc" }, take: 50000 });
     rows = [["createdAt", "recipient", "template", "subject", "provider", "status", "error", "retries"], ...es.map((e) => [e.createdAt, e.recipient, e.template, e.subject, e.provider, e.status, e.error, e.retryCount])];
+  } else if (type === "compliance") {
+    const cr = await complianceRows({ audienceId: sp.audience, courseId: sp.course, branch: sp.branch, area: sp.area, status: sp.status, mandatoryOnly: sp.all !== "1" });
+    rows = [["learner", "email", "jobRole", "branch", "area", "department", "course", "type", "progress", "dueAt", "status", "completedAt"], ...cr.map((r) => [`${r.user.firstName} ${r.user.lastName}`, r.user.email, r.user.audience?.nameEn ?? "", r.user.branch, r.user.area, r.user.department, r.course.titleEn, r.source, r.percent, r.dueAt, r.compliance, r.completedAt])];
   } else if (type === "quizzes") {
     const as = await db.quizAttempt.findMany({ where: { submittedAt: r }, orderBy: { submittedAt: "desc" }, take: 50000, include: { user: true, quiz: true } });
     rows = [["submittedAt", "student", "quiz", "score", "passed"], ...as.map((a) => [a.submittedAt, a.user.email, a.quiz.titleEn, a.scorePct, a.passed])];

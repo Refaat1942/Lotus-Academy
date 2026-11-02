@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { resumeLesson } from "@/lib/domain";
+import { visibleCoursesWhere, audienceOf } from "@/lib/audience";
 import { listCourses } from "@/lib/catalog";
 import { CourseCard } from "@/components/CourseCard";
 import { EmptyState, Progress, StatCard } from "@/components/ui";
@@ -37,12 +38,35 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const resumeId = current ? resumeLesson(current.course.lessons, doneSet, current.lastLessonId) : null;
   const resume = current?.course.lessons.find((l) => l.id === resumeId);
   const enrolledIds = new Set(enrollments.map((e) => e.courseId));
-  const rec = (await listCourses({ sort: "popular" })).items.filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
+  const rec = (await listCourses({ sort: "popular", visible: visibleCoursesWhere(user, await audienceOf(user.id)) })).items.filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       {sp.denied && <p role="alert" className="mb-6 rounded border border-warning/40 bg-warning/10 px-4 py-3 text-sm">{t("dash.denied")}</p>}
       <h1 className="text-3xl font-semibold tracking-tight text-primary-dark">{t("dash.welcome")}, {user.firstName}</h1>
+
+      {(() => {
+        const required = enrollments.filter((e) => e.source === "assigned" && e.status !== "COMPLETED");
+        if (!required.length) return null;
+        const now = new Date();
+        return (
+          <section className="mt-8 rounded-2xl border-2 border-warning/40 bg-warning/5 p-5">
+            <h2 className="mb-3 text-lg font-extrabold text-primary-dark">{t("dash.required")}</h2>
+            <ul className="grid gap-3 md:grid-cols-2">
+              {required.map((e) => {
+                const overdue = !!e.dueAt && e.dueAt < now;
+                return (
+                  <li key={e.id}><Link href={`/courses/${e.course.slug}`} className="card flex items-center justify-between gap-3 p-4 hover:border-primary">
+                    <span className="min-w-0"><span className="block font-semibold">{pick(locale, e.course.titleEn, e.course.titleAr)}</span>
+                      {e.dueAt && <span className={`text-xs ${overdue ? "font-bold text-error" : "text-muted"}`}>{overdue ? t("dash.overdue") : t("dash.due")}: {e.dueAt.toLocaleDateString()}</span>}</span>
+                    <span className="text-sm font-semibold text-primary">{pm.get(e.courseId) ?? 0}%</span>
+                  </Link></li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })()}
 
       {current && resume && (
         <section className="card mt-8 flex flex-wrap items-center justify-between gap-4 border-primary/30 bg-primary-light/40 p-6">

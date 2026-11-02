@@ -9,6 +9,9 @@ import { ContentStatus, CourseLevel } from "@prisma/client";
 import { sendMail } from "@/lib/mail";
 import { validateBrandUpload } from "@/lib/brand";
 import { safeFileName, validateMaterial } from "@/lib/materials";
+import { syncAssignments } from "@/lib/audience";
+import { importUsers, tempPassword, type ImportResult } from "@/lib/users-admin";
+import { hashPassword } from "@/lib/auth-core";
 
 type State = { error?: string; ok?: string } | null;
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
@@ -455,6 +458,7 @@ export async function setUserStatusAction(fd: FormData) {
   if (target.roles.some((r) => r.role.key === "SUPER_ADMIN") && !user.roles.includes("SUPER_ADMIN")) throw new Error("Forbidden");
   await db.user.update({ where: { id }, data: { status } });
   if (status !== "ACTIVE") await db.$transaction([db.session.deleteMany({ where: { userId: id } }), db.authToken.deleteMany({ where: { userId: id } })]);
+  if (status === "ACTIVE") await syncAssignments({ userId: id });
   await audit(user.id, "user.status", "User", id, { status });
   revalidatePath("/admin/users");
 }
@@ -508,6 +512,7 @@ export async function saveSettingsAction(_: State, fd: FormData): Promise<State>
     set("brand.subtitle", { en: String(fd.get("subtitleEn") ?? "").slice(0, 200), ar: String(fd.get("subtitleAr") ?? "").slice(0, 200) }),
     set("contact.email", String(fd.get("contactEmail") ?? "").slice(0, 200)),
     set("certificate.issuer", { en: String(fd.get("issuerEn") ?? "").slice(0, 200), ar: String(fd.get("issuerAr") ?? "").slice(0, 200) }),
+    set("registration.mode", ["email", "approval", "closed"].includes(String(fd.get("registrationMode"))) ? String(fd.get("registrationMode")) : "approval"),
   ]);
   await audit(user.id, "settings.update", "SystemSetting");
   revalidatePath("/", "layout");
@@ -560,4 +565,116 @@ export async function removeBrandAction(fd: FormData) {
   await db.brandAsset.deleteMany({ where: { key: slot } });
   await audit(user.id, "brand.remove", "BrandAsset", slot);
   revalidatePath("/", "layout");
+}
+
+// ---------- Audiences (job roles / learning tracks) ----------
+
+/** Saves who a course is for: visibility + per-audience targeting, mandatory flag and due days. */
+export async function saveCourseAudiencesAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("courses.write");
+  const courseId = String(fd.get("courseId"));
+  await assertCourseAccess(user, courseId);
+  const visibility = fd.get("visibility") === "AUDIENCE" ? "AUDIENCE" : "ALL";
+  const audiences = await db.audience.findMany();
+  const rows = audiences
+    .filter((a) => fd.get(`target_${a.id}`) === "on")
+    .map((a) => {
+      const days = parseInt(String(fd.get(`due_${a.id}`) ?? ""), 10);
+      return { courseId, audienceId: a.id, required: fd.get(`required_${a.id}`) === "on", dueDays: Number.isFinite(days) && days > 0 ? Math.min(days, 3650) : null };
+    });
+  if (visibility === "AUDIENCE" && !rows.length) return { error: "Choose at least one audience, or make the course visible to everyone." };
+  await db.$transaction([
+    db.course.update({ where: { id: courseId }, data: { visibility } }),
+    db.courseAudience.deleteMany({ where: { courseId } }),
+    db.courseAudience.createMany({ data: rows }),
+  ]);
+  const assigned = await syncAssignments({ courseId });
+  await audit(user.id, "course.audiences", "Course", courseId, { visibility, audiences: rows.length, assigned });
+  revalidatePath(`/admin/courses/${courseId}`);
+  return { ok: `Saved.${assigned ? ` ${assigned} learner(s) newly assigned.` : ""}` };
+}
+
+export async function saveAudienceAction(_: State, fd: FormData): Promise<State> {
+  const user = await assertPermission("settings.write");
+  const id = String(fd.get("id") ?? "");
+  const nameEn = String(fd.get("nameEn") ?? "").trim().slice(0, 80);
+  const nameAr = String(fd.get("nameAr") ?? "").trim().slice(0, 80);
+  if (!nameEn || !nameAr) return { error: "English and Arabic names are required." };
+  const sortOrder = parseInt(String(fd.get("sortOrder") ?? "0"), 10) || 0;
+  if (id) await db.audience.update({ where: { id }, data: { nameEn, nameAr, sortOrder } });
+  else {
+    const key = nameEn.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || `AUD_${Date.now()}`;
+    if (await db.audience.findUnique({ where: { key } })) return { error: "An audience with this name already exists." };
+    await db.audience.create({ data: { key, nameEn, nameAr, sortOrder } });
+  }
+  await audit(user.id, id ? "audience.update" : "audience.create", "Audience", id || nameEn);
+  revalidatePath("/admin/audiences");
+  return { ok: "Saved." };
+}
+
+const userProfileSchema = z.object({
+  firstName: z.string().trim().min(1).max(60),
+  lastName: z.string().trim().min(1).max(60),
+  phone: z.string().trim().max(30).optional(),
+  audienceId: z.string().optional(),
+  branch: z.string().trim().max(120).optional(),
+  area: z.string().trim().max(120).optional(),
+  department: z.string().trim().max(120).optional(),
+});
+
+export async function updateUserProfileAction(_: State, fd: FormData): Promise<State> {
+  const actor = await assertPermission("users.write");
+  const id = String(fd.get("id"));
+  const p = userProfileSchema.safeParse(Object.fromEntries(fd));
+  if (!p.success) return { error: "Please check the fields." };
+  const d = p.data;
+  const audienceId = d.audienceId && (await db.audience.findUnique({ where: { id: d.audienceId } })) ? d.audienceId : null;
+  const before = await db.user.findUniqueOrThrow({ where: { id } });
+  await db.user.update({ where: { id }, data: { firstName: d.firstName, lastName: d.lastName, phone: d.phone || null, audienceId, branch: d.branch || null, area: d.area || null, department: d.department || null } });
+  const assigned = before.audienceId !== audienceId ? await syncAssignments({ userId: id }) : 0;
+  await audit(actor.id, "user.profile", "User", id, { audienceId, assigned });
+  revalidatePath(`/admin/users/${id}`);
+  return { ok: `Saved.${assigned ? ` ${assigned} required course(s) assigned.` : ""}` };
+}
+
+// ---------- Staff onboarding ----------
+
+export type ImportState = (ImportResult & { error?: string }) | null;
+
+export async function importUsersAction(_: ImportState, fd: FormData): Promise<ImportState> {
+  const actor = await assertPermission("users.write");
+  const file = fd.get("file");
+  let text = String(fd.get("csv") ?? "");
+  if (file instanceof File && file.size) {
+    if (file.size > 2 * 1024 * 1024) return { created: 0, updated: 0, assigned: 0, errors: [], credentials: [], error: "File is larger than 2 MB." };
+    text = await file.text();
+  }
+  if (!text.trim()) return { created: 0, updated: 0, assigned: 0, errors: [], credentials: [], error: "Choose a CSV file or paste CSV text." };
+  const r = await importUsers(text);
+  await audit(actor.id, "users.import", "User", undefined, { created: r.created, updated: r.updated, errors: r.errors.length, assigned: r.assigned });
+  revalidatePath("/admin/users");
+  return r; // temporary passwords are returned once to the admin and never stored in clear text
+}
+
+export async function createUserAction(_: State, fd: FormData): Promise<State> {
+  const actor = await assertPermission("users.write");
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  const firstName = String(fd.get("firstName") ?? "").trim().slice(0, 60);
+  const lastName = String(fd.get("lastName") ?? "").trim().slice(0, 60);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !firstName || !lastName) return { error: "Email, first name and last name are required." };
+  if (await db.user.findUnique({ where: { email } })) return { error: "A user with this email already exists." };
+  const audienceId = String(fd.get("audienceId") ?? "") || null;
+  const student = await db.role.findUniqueOrThrow({ where: { key: "STUDENT" } });
+  const password = tempPassword();
+  const u = await db.user.create({
+    data: {
+      email, firstName, lastName, audienceId, branch: String(fd.get("branch") ?? "").trim() || null, area: String(fd.get("area") ?? "").trim() || null,
+      department: String(fd.get("department") ?? "").trim() || null, passwordHash: await hashPassword(password), status: "ACTIVE", emailVerifiedAt: new Date(), mustChangePassword: true,
+      roles: { create: { roleId: student.id } }, studentProfile: { create: {} },
+    },
+  });
+  const assigned = await syncAssignments({ userId: u.id });
+  await audit(actor.id, "user.create", "User", u.id, { assigned });
+  revalidatePath("/admin/users");
+  return { ok: `Account created for ${email}. Temporary password: ${password} — share it privately; the user must change it at first sign-in.${assigned ? ` ${assigned} required course(s) assigned.` : ""}` };
 }

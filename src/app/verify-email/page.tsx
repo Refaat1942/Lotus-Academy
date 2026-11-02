@@ -16,6 +16,7 @@ export default async function VerifyEmail({ searchParams }: { searchParams: Prom
       ) : (
         <>
           {sp.sent && <p role="status" className="mb-4 text-sm">{t("auth.verify.sent")}</p>}
+          {sp.pending && <p role="status" className="mb-4 rounded border border-success/30 bg-success/10 px-3 py-2 text-sm">{t("auth.pendingApproval")}</p>}
           {sp.bad && <p role="alert" className="mb-4 rounded border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{t("auth.verify.bad")}</p>}
           <ActionForm action={resendVerificationAction} submitLabel={t("auth.verify.resend")} buttonClass="btn-secondary w-full">
             <div><label className="label" htmlFor="email">{t("auth.email")}</label><input id="email" name="email" type="email" required className="input" /></div>

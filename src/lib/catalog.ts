@@ -10,6 +10,9 @@ export interface CourseQuery {
   duration?: string; // "short" (<=6h) | "medium" (<=10h) | "long" (>10h)
   sort?: string;
   page?: number;
+  track?: string; // audience key
+  /** Restricts the result to what this viewer may see (see visibleCoursesWhere). */
+  visible?: Prisma.CourseWhereInput;
 }
 
 export async function listCourses(query: CourseQuery) {
@@ -29,6 +32,8 @@ export async function listCourses(query: CourseQuery) {
     });
   }
   if (query.category) and.push({ category: { slug: query.category } });
+  if (query.track) and.push({ audiences: { some: { audience: { key: query.track } } } });
+  if (query.visible) and.push(query.visible);
   if (query.level && ["BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(query.level)) and.push({ level: query.level as "BEGINNER" });
   if (query.duration === "short") and.push({ durationMinutes: { lte: 360 } });
   if (query.duration === "medium") and.push({ durationMinutes: { gt: 360, lte: 600 } });

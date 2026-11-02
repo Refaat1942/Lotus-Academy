@@ -6,7 +6,7 @@ import { AdminTitle } from "@/components/admin";
 import { Badge } from "@/components/ui";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmAction } from "@/components/ConfirmAction";
-import { addModuleAction, archiveLessonAction, assignInstructorAction, createLessonAction, deleteModuleAction, moveLessonAction, moveModuleAction, removeCourseCoverAction, removeInstructorAction, setLessonModuleAction, updateCourseAction, updateModuleAction, uploadCourseCoverAction } from "@/app/actions/admin";
+import { saveCourseAudiencesAction, addModuleAction, archiveLessonAction, assignInstructorAction, createLessonAction, deleteModuleAction, moveLessonAction, moveModuleAction, removeCourseCoverAction, removeInstructorAction, setLessonModuleAction, updateCourseAction, updateModuleAction, uploadCourseCoverAction } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,12 @@ export default async function EditCourse({ params }: { params: Promise<{ id: str
     db.course.findFirst({ where: { id, deletedAt: null }, include: { instructors: { include: { instructor: { include: { user: true } } } }, lessons: { where: { deletedAt: null }, orderBy: { position: "asc" }, include: { quizzes: { select: { id: true, status: true } }, _count: { select: { videos: true, assets: true } } } }, modules: { orderBy: { position: "asc" } } } }),
     db.courseCategory.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
+  const [audiences, links, assignedCount] = await Promise.all([
+    db.audience.findMany({ orderBy: { sortOrder: "asc" }, include: { _count: { select: { users: true } } } }),
+    db.courseAudience.findMany({ where: { courseId: id } }),
+    db.enrollment.count({ where: { courseId: id, source: "assigned" } }),
+  ]);
+  const link = new Map(links.map((l) => [l.audienceId, l]));
   if (!c) notFound();
   const canWrite = me.permissions.has("courses.write");
   const canLessons = me.permissions.has("lessons.write");
@@ -48,6 +54,21 @@ export default async function EditCourse({ params }: { params: Promise<{ id: str
         </section>
 
         <div className="space-y-8">
+          <section className="card p-5"><h2 className="mb-1 font-semibold">Who is this course for?</h2>
+            <p className="mb-3 text-xs text-muted">Target job roles, make it mandatory with a due date, or restrict visibility. Mandatory courses are assigned automatically to everyone in that role ({assignedCount} assigned so far).</p>
+            {canWrite ? (
+              <ActionForm action={saveCourseAudiencesAction} submitLabel="Save audiences" buttonClass="btn-primary">
+                <input type="hidden" name="courseId" value={c.id} />
+                <div><label className="label" htmlFor="visibility">Visibility</label><select id="visibility" name="visibility" defaultValue={c.visibility} className="input"><option value="ALL">Everyone can see and enrol</option><option value="AUDIENCE">Only the selected job roles</option></select></div>
+                <table className="w-full text-sm"><thead><tr className="text-start text-xs text-muted"><th className="py-1 text-start">Job role</th><th className="py-1">Target</th><th className="py-1">Mandatory</th><th className="py-1">Due (days)</th></tr></thead>
+                  <tbody>{audiences.map((a) => { const l = link.get(a.id); return (
+                    <tr key={a.id} className="border-t border-border"><td className="py-2">{a.nameEn}<span className="block text-xs text-muted">{a._count.users} users</span></td>
+                      <td className="text-center"><input type="checkbox" name={`target_${a.id}`} defaultChecked={!!l} aria-label={`Target ${a.nameEn}`} /></td>
+                      <td className="text-center"><input type="checkbox" name={`required_${a.id}`} defaultChecked={!!l?.required} aria-label={`Mandatory for ${a.nameEn}`} /></td>
+                      <td><input name={`due_${a.id}`} type="number" min={1} max={3650} defaultValue={l?.dueDays ?? ""} aria-label={`Due days for ${a.nameEn}`} className="input !py-1" /></td></tr>); })}</tbody></table>
+              </ActionForm>
+            ) : <p className="text-sm text-muted">{c.visibility === "ALL" ? "Visible to everyone" : "Restricted"} · {links.length} role(s)</p>}
+          </section>
           <section className="card p-5"><h2 className="mb-3 font-semibold">Cover image</h2>
             {c.thumbnailUrl ? (<div className="mb-3 space-y-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={c.thumbnailUrl} alt="Course cover" className="h-28 w-full rounded-xl border border-border object-cover" />{canWrite && <form action={removeCourseCoverAction}><input type="hidden" name="courseId" value={c.id} /><button className="btn-secondary !text-error" type="submit">Remove cover</button></form>}</div>) : <p className="mb-3 text-sm text-muted">No cover: the course shows its category color and icon.</p>}
             {canWrite && <ActionForm action={uploadCourseCoverAction} submitLabel="Upload cover" buttonClass="btn-secondary"><input type="hidden" name="courseId" value={c.id} /><input name="file" type="file" required accept="image/*" aria-label="Cover image file" className="input" /></ActionForm>}

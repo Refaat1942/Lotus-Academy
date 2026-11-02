@@ -7,13 +7,15 @@ import { changePasswordAction, updateProfileAction } from "@/app/actions/profile
 export const metadata = { title: "Profile" };
 export const dynamic = "force-dynamic";
 
-export default async function Profile() {
-  const me = await requireUser();
+export default async function Profile({ searchParams }: { searchParams: Promise<{ mustChange?: string }> }) {
+  const sp = await searchParams;
+  const me = await requireUser({ allowPasswordChange: true });
   const { t } = await getT();
   const u = await db.user.findUniqueOrThrow({ where: { id: me.id }, include: { studentProfile: true } });
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-semibold text-primary-dark">{t("profile.title")}</h1>
+      {(me.mustChangePassword || sp.mustChange) && <p role="alert" className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm font-medium">{t("profile.mustChange")}</p>}
       <section className="card p-6">
         <ActionForm action={updateProfileAction} submitLabel={t("common.save")} buttonClass="btn-primary">
           <div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="firstName">{t("auth.firstName")}</label><input id="firstName" name="firstName" defaultValue={u.firstName} required className="input" /></div><div><label className="label" htmlFor="lastName">{t("auth.lastName")}</label><input id="lastName" name="lastName" defaultValue={u.lastName} required className="input" /></div></div>

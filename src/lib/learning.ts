@@ -11,6 +11,12 @@ export const publishedLessonsWhere = (courseId: string) => ({ courseId, status: 
 export async function enroll(userId: string, courseId: string) {
   const course = await db.course.findFirst({ where: { id: courseId, status: "PUBLISHED", deletedAt: null } });
   if (!course) throw new Error("Course not available");
+  if (course.visibility === "AUDIENCE") {
+    const u = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { audienceId: true, roles: { select: { role: { select: { key: true } } } } } });
+    const staff = u.roles.some((r) => r.role.key !== "STUDENT");
+    const targeted = u.audienceId ? await db.courseAudience.count({ where: { courseId, audienceId: u.audienceId } }) : 0;
+    if (!staff && !targeted) throw new Error("Course not available");
+  }
   const existing = await db.enrollment.findUnique({ where: { userId_courseId: { userId, courseId } } });
   if (existing) {
     if (existing.status === "CANCELLED") await db.enrollment.update({ where: { id: existing.id }, data: { status: "ACTIVE" } });

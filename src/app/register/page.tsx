@@ -18,7 +18,7 @@ export default async function Register() {
         <div><label className="label" htmlFor="email">{t("auth.email")}</label><input id="email" name="email" type="email" required autoComplete="email" className="input" /></div>
         <div><label className="label" htmlFor="password">{t("auth.password")}</label><input id="password" name="password" type="password" required minLength={10} autoComplete="new-password" aria-describedby="pwhint" className="input" /><p id="pwhint" className="mt-1 text-xs text-muted">{t("auth.passwordHint")}</p></div>
         <div><label className="label" htmlFor="phone">{t("auth.phone")}</label><input id="phone" name="phone" type="tel" maxLength={30} autoComplete="tel" className="input" /></div>
-        <div><label className="label" htmlFor="pharmacy">{t("auth.pharmacy")}</label><input id="pharmacy" name="pharmacy" maxLength={120} className="input" /></div>
+        <div><label className="label" htmlFor="branch">{t("auth.branch")}</label><input id="branch" name="branch" maxLength={120} className="input" /></div>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="terms" required className="mt-1" /><span>{t("auth.terms")}</span></label>
       </ActionForm>
     </AuthShell>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getT } from "@/i18n";
@@ -20,28 +21,33 @@ export default async function Users({ searchParams }: { searchParams: Promise<Re
   if (sp.q) where.OR = [{ email: { contains: sp.q, mode: "insensitive" } }, { firstName: { contains: sp.q, mode: "insensitive" } }, { lastName: { contains: sp.q, mode: "insensitive" } }];
   if (sp.role && ROLES[sp.role]) where.roles = { some: { role: { key: sp.role } } };
   if (sp.status && ["PENDING", "ACTIVE", "SUSPENDED", "DISABLED"].includes(sp.status)) where.status = sp.status as "ACTIVE";
+  if (sp.audience) where.audienceId = sp.audience;
+  if (sp.branch) where.branch = { contains: sp.branch, mode: "insensitive" };
   const order = sp.sort === "email" ? { email: "asc" as const } : { createdAt: "desc" as const };
-  const [total, users] = await Promise.all([db.user.count({ where }), db.user.findMany({ where, orderBy: order, skip: (page - 1) * SIZE, take: SIZE, include: { roles: { include: { role: true } } } })]);
+  const [total, users] = await Promise.all([db.user.count({ where }), db.user.findMany({ where, orderBy: order, skip: (page - 1) * SIZE, take: SIZE, include: { roles: { include: { role: true } }, audience: true } })]);
+  const audiences = await db.audience.findMany({ orderBy: { sortOrder: "asc" } });
   const canWrite = me.permissions.has("users.write");
   const canRoles = me.permissions.has("roles.write");
   const tone = { ACTIVE: "success", PENDING: "warning", SUSPENDED: "error", DISABLED: "error" } as const;
   return (
     <>
-      <AdminTitle title={t("admin.users")} actions={<a className="btn-secondary" href="/api/admin/export/users?range=90d">{t("common.export")}</a>} />
+      <AdminTitle title={t("admin.users")} actions={<>{canWrite && <Link className="btn-primary" href="/admin/users/new">+ Add / import staff</Link>}<a className="btn-secondary" href="/api/admin/export/users?range=90d">{t("common.export")}</a></>} />
       <form method="get" role="search" className="mb-4 flex flex-wrap gap-3">
         <input name="q" defaultValue={sp.q} placeholder={t("common.search")} aria-label={t("common.search")} className="input max-w-xs" />
         <select name="role" defaultValue={sp.role ?? ""} aria-label="Role" className="input max-w-[11rem]"><option value="">{t("common.all")}</option>{Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.name}</option>)}</select>
+        <select name="audience" defaultValue={sp.audience ?? ""} aria-label="Job role" className="input max-w-[11rem]"><option value="">All job roles</option>{audiences.map((a) => <option key={a.id} value={a.id}>{a.nameEn}</option>)}</select>
+        <input name="branch" defaultValue={sp.branch} placeholder="Branch" aria-label="Branch" className="input max-w-[9rem]" />
         <select name="status" defaultValue={sp.status ?? ""} aria-label="Status" className="input max-w-[11rem]"><option value="">{t("common.all")}</option>{["PENDING", "ACTIVE", "SUSPENDED", "DISABLED"].map((s) => <option key={s}>{s}</option>)}</select>
         <select name="sort" defaultValue={sp.sort ?? ""} aria-label="Sort" className="input max-w-[11rem]"><option value="">Newest</option><option value="email">Email</option></select>
         <button className="btn-primary" type="submit">{t("common.search")}</button>
       </form>
-      <Table caption={t("admin.users")} head={["Name", "Email", "Roles", t("common.status"), "Joined", t("common.actions")]}>
+      <Table caption={t("admin.users")} head={["Name", "Email", "Job role", "Branch / Area", "Roles", t("common.status"), t("common.actions")]}>
         {users.map((u) => (
           <tr key={u.id}>
-            <Td>{u.firstName} {u.lastName}</Td><Td className="text-muted">{u.email}</Td>
+            <Td><Link className="font-medium text-primary" href={`/admin/users/${u.id}`}>{u.firstName} {u.lastName}</Link></Td><Td className="text-muted">{u.email}</Td>
+            <Td>{u.audience?.nameEn ?? <span className="text-muted">—</span>}</Td><Td className="text-xs text-muted">{[u.branch, u.area].filter(Boolean).join(" · ") || "—"}</Td>
             <Td><div className="flex flex-wrap gap-1">{u.roles.map((r) => <Badge key={r.roleId} tone="primary">{r.role.key}</Badge>)}</div></Td>
             <Td><Badge tone={tone[u.status]}>{u.status}</Badge></Td>
-            <Td className="text-muted">{u.createdAt.toLocaleDateString()}</Td>
             <Td>
               <div className="flex flex-wrap gap-2">
                 {canWrite && u.id !== me.id && (u.status === "ACTIVE"

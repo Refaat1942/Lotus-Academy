@@ -74,3 +74,34 @@ export async function coursePerformance() {
   const pm = new Map(prog.map((p) => [p.courseId, Math.round(p._avg.percent ?? 0)]));
   return courses.map((c) => ({ code: c.code ?? "", title: c.titleEn, enrollments: c._count.enrollments, completions: dm.get(c.id) ?? 0, avgProgress: pm.get(c.id) ?? 0 }));
 }
+
+import { complianceStatus, type ComplianceStatus } from "./audience";
+
+export interface ComplianceFilter { audienceId?: string; courseId?: string; branch?: string; area?: string; status?: string; mandatoryOnly?: boolean }
+
+/** One row per (learner, course) enrolment, with progress and compliance status. */
+export async function complianceRows(f: ComplianceFilter) {
+  const rows = await db.enrollment.findMany({
+    where: {
+      status: { not: "CANCELLED" },
+      ...(f.mandatoryOnly !== false ? { source: "assigned" } : {}),
+      ...(f.courseId ? { courseId: f.courseId } : {}),
+      user: {
+        deletedAt: null,
+        ...(f.audienceId ? { audienceId: f.audienceId } : {}),
+        ...(f.branch ? { branch: { contains: f.branch, mode: "insensitive" as const } } : {}),
+        ...(f.area ? { area: { contains: f.area, mode: "insensitive" as const } } : {}),
+      },
+    },
+    include: { user: { include: { audience: true } }, course: { select: { id: true, titleEn: true, code: true } } },
+    orderBy: [{ course: { sortOrder: "asc" } }, { user: { lastName: "asc" } }],
+    take: 20000,
+  });
+  const prog = await db.courseProgress.findMany({ where: { OR: rows.map((r) => ({ userId: r.userId, courseId: r.courseId })) } });
+  const pm = new Map(prog.map((p) => [`${p.userId}:${p.courseId}`, p.percent]));
+  const out = rows.map((r) => {
+    const percent = pm.get(`${r.userId}:${r.courseId}`) ?? 0;
+    return { ...r, percent, compliance: complianceStatus(r, percent) as ComplianceStatus };
+  });
+  return f.status ? out.filter((r) => r.compliance === f.status) : out;
+}

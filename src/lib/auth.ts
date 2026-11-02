@@ -56,6 +56,7 @@ export interface CurrentUser {
   locale: string;
   roles: string[];
   permissions: Set<string>;
+  mustChangePassword: boolean;
 }
 
 /** Resolves the logged-in user from the session cookie. Cached per request. */
@@ -73,12 +74,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const permissions = new Set<string>();
   if (roles.includes("SUPER_ADMIN")) PERMISSIONS.forEach((p) => permissions.add(p));
   for (const r of u.roles) for (const rp of r.role.permissions) permissions.add(rp.permission.key);
-  return { id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, locale: u.locale, roles, permissions };
+  return { id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, locale: u.locale, roles, permissions, mustChangePassword: u.mustChangePassword };
 });
 
-export async function requireUser(): Promise<CurrentUser> {
+export async function requireUser(opts: { allowPasswordChange?: boolean } = {}): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // Accounts created by an admin (temporary password) must set their own password first.
+  if (user.mustChangePassword && !opts.allowPasswordChange) redirect("/profile?mustChange=1");
   return user;
 }
 

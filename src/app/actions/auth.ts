@@ -24,6 +24,7 @@ const registerSchema = z.object({
   password: z.string().max(128),
   phone: z.string().trim().max(30).optional(),
   pharmacy: z.string().trim().max(120).optional(),
+  branch: z.string().trim().max(120).optional(),
   terms: z.literal("on"),
 });
 
@@ -39,8 +40,16 @@ async function sendVerification(user: { id: string; email: string; firstName: st
   await sendMail(user.email, "email_verification", { name: user.firstName, url: `${env.appUrl()}/verify-email?token=${token}` });
 }
 
+async function registrationMode(): Promise<"email" | "approval" | "closed"> {
+  const s = await db.systemSetting.findUnique({ where: { key: "registration.mode" } });
+  const v = typeof s?.value === "string" ? s.value : process.env.SMTP_HOST ? "email" : "approval";
+  return v === "closed" || v === "email" ? v : "approval";
+}
+
 export async function registerAction(_: State, fd: FormData): Promise<State> {
   const { t } = await getT();
+  const mode = await registrationMode();
+  if (mode === "closed") return { error: t("auth.registrationClosed") };
   const ip = await clientIp();
   if (!(await rateLimit(`register:${ip}`, 8, 3600))) return { error: t("auth.locked") };
   const parsed = registerSchema.safeParse(Object.fromEntries(fd));
@@ -52,19 +61,22 @@ export async function registerAction(_: State, fd: FormData): Promise<State> {
   const existing = await db.user.findUnique({ where: { email: d.email } });
   if (!existing) {
     const role = await db.role.findUnique({ where: { key: "STUDENT" } });
+    const pharmacist = await db.audience.findUnique({ where: { key: "PHARMACIST" } });
     const user = await db.user.create({
       data: {
         email: d.email, firstName: d.firstName, lastName: d.lastName, phone: d.phone || null,
+        branch: d.branch || null, audienceId: pharmacist?.id ?? null,
         passwordHash: await hashPassword(d.password), status: "PENDING",
         studentProfile: { create: { pharmacyName: d.pharmacy || null } },
         roles: role ? { create: { roleId: role.id } } : undefined,
       },
     });
-    await sendVerification(user);
-    await audit(user.id, "auth.register", "User", user.id);
-  } else if (existing.status === "PENDING") {
+    if (mode === "email") await sendVerification(user);
+    await audit(user.id, "auth.register", "User", user.id, { mode });
+  } else if (existing.status === "PENDING" && mode === "email") {
     await sendVerification(existing);
   }
+  if (mode === "approval") redirect("/verify-email?pending=1");
   // Identical response whether or not the email existed (prevents account enumeration).
   redirect("/verify-email?sent=1");
 }
@@ -89,7 +101,7 @@ export async function loginAction(_: State, fd: FormData): Promise<State> {
     log("warn", "auth.login_failed", { userId: user.id, ip });
     return { error: t("auth.invalid") };
   }
-  if (user.status === "PENDING") return { error: t("auth.unverified") };
+  if (user.status === "PENDING") return { error: (await registrationMode()) === "email" ? t("auth.unverified") : t("auth.pendingApproval") };
   if (user.status !== "ACTIVE") return { error: t("auth.suspended") };
 
   await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } });
@@ -97,6 +109,7 @@ export async function loginAction(_: State, fd: FormData): Promise<State> {
   log("info", "auth.login", { userId: user.id });
   const staff = user.roles.some((r) => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR", "CONTENT_MANAGER", "SUPPORT"].includes(r.role.key));
   const next = String(fd.get("next") ?? "");
+  if (user.mustChangePassword) redirect("/profile?mustChange=1");
   redirect(/^\/(?![\/\\])/.test(next) ? next : staff ? "/admin" : "/dashboard");
 }
 

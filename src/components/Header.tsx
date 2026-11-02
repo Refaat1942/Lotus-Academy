@@ -14,7 +14,7 @@ const navLink = "relative px-3 py-6 text-[15px] font-semibold text-text transiti
 export async function Header() {
   const { t, locale } = await getT();
   const user = await getCurrentUser();
-  const categories = await db.courseCategory.findMany({ orderBy: { sortOrder: "asc" }, include: { courses: { where: { status: "PUBLISHED", deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { slug: true, titleEn: true, titleAr: true }, take: 3 } } });
+  const categories = await db.courseCategory.findMany({ orderBy: { sortOrder: "asc" }, include: { courses: { where: { status: "PUBLISHED", deletedAt: null, visibility: "ALL" }, orderBy: { sortOrder: "asc" }, select: { slug: true, titleEn: true, titleAr: true }, take: 3 } } });
   const links = [["/categories", t("nav.categories")], ["/instructors", t("nav.instructors")], ["/about", t("nav.about")], ["/faq", t("nav.faq")], ["/contact", t("nav.contact")]] as const;
 
   return (

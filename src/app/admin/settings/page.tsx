@@ -46,6 +46,12 @@ export default async function Settings() {
           <div><label className="label" htmlFor="subtitleAr">Academy subtitle (AR)</label><input id="subtitleAr" name="subtitleAr" dir="rtl" defaultValue={sub.ar} className="input" /></div>
           <div><label className="label" htmlFor="issuerEn">Certificate issuer (EN)</label><input id="issuerEn" name="issuerEn" defaultValue={iss.en} className="input" /></div>
           <div><label className="label" htmlFor="issuerAr">Certificate issuer (AR)</label><input id="issuerAr" name="issuerAr" dir="rtl" defaultValue={iss.ar} className="input" /></div>
+          <div><label className="label" htmlFor="registrationMode">Self-registration</label>
+            <select id="registrationMode" name="registrationMode" defaultValue={typeof s["registration.mode"] === "string" ? (s["registration.mode"] as string) : "approval"} className="input">
+              <option value="approval">Open — new accounts wait for admin approval (no email needed)</option>
+              <option value="email">Open — verify by email (requires SMTP)</option>
+              <option value="closed">Closed — only admins create accounts</option>
+            </select></div>
           <div><label className="label" htmlFor="contactEmail">Contact email</label><input id="contactEmail" name="contactEmail" type="email" defaultValue={typeof s["contact.email"] === "string" ? (s["contact.email"] as string) : ""} className="input" /></div>
         </ActionForm>
       </section>

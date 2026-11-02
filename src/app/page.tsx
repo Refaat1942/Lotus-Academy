@@ -3,6 +3,7 @@ import { ArrowRight, Award, BookOpenCheck, Languages, ShieldCheck, Stethoscope }
 import { db } from "@/lib/db";
 import { getT, pick, type MessageKey } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
+import { visibleCoursesWhere, audienceOf } from "@/lib/audience";
 import { listCourses, progressFor } from "@/lib/catalog";
 import { CourseCard } from "@/components/CourseCard";
 import { categoryIcon } from "@/components/icons";
@@ -33,7 +34,7 @@ export default async function Home() {
   const user = await getCurrentUser();
   const brand = await getBrand();
   const [featured, categories, courseCount, lessonCount, questionCount] = await Promise.all([
-    listCourses({ sort: "popular" }),
+    listCourses({ sort: "popular", visible: visibleCoursesWhere(user, await audienceOf(user?.id)) }),
     db.courseCategory.findMany({ orderBy: { sortOrder: "asc" }, include: { _count: { select: { courses: { where: { status: "PUBLISHED" } } } } } }),
     db.course.count({ where: { status: "PUBLISHED", deletedAt: null } }),
     db.lesson.count({ where: { status: "PUBLISHED", deletedAt: null } }),

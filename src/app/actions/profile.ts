@@ -26,7 +26,8 @@ export async function changePasswordAction(_: State, fd: FormData): Promise<Stat
   const next = String(fd.get("password") ?? "");
   const problem = passwordProblem(next);
   if (problem) return { error: problem };
-  await db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(next) } });
+  if (await verifyPassword(next, u.passwordHash)) return { error: "Choose a new password that is different from the current one." };
+  await db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false } });
   await db.session.deleteMany({ where: { userId: u.id } }); // end every other session
   await createSession(u.id);
   await audit(u.id, "auth.password_change", "User", u.id);

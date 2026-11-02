@@ -12,6 +12,7 @@ const GROUPS: [string, Item[]][] = [
     ["/admin/users", "admin.users", "users.read", "users"],
     ["/admin/users?role=STUDENT", "admin.students", "users.read", "students"],
     ["/admin/users?role=INSTRUCTOR", "admin.instructors", "users.read", "instructors"],
+    ["/admin/audiences", "admin.audiences", "settings.write", "audiences"],
   ]],
   ["Learning", [
     ["/admin/courses", "admin.courses", "courses.read", "courses"],
@@ -20,7 +21,7 @@ const GROUPS: [string, Item[]][] = [
     ["/admin/enrollments", "admin.enrollments", "enrollments.read", "enrollments"],
     ["/admin/certificates", "admin.certificates", "certificates.read", "certificates"],
   ]],
-  ["Insights", [["/admin/reports", "admin.reports", "reports.read", "reports"]]],
+  ["Insights", [["/admin/reports", "admin.reports", "reports.read", "reports"], ["/admin/compliance", "admin.compliance", "reports.read", "compliance"]]],
   ["System", [
     ["/admin/notifications", "admin.notifications", "settings.write", "notifications"],
     ["/admin/emails", "admin.emails", "emails.read", "emails"],
