@@ -1,10 +1,29 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, answerOpenAttempt, completeLessonUI, db, plantToken, resetRateLimits } from "./helpers";
+import { PASSWORD, setRegistrationMode, answerOpenAttempt, completeLessonUI, db, plantToken, resetRateLimits } from "./helpers";
 
 const email = `student-${Date.now()}@e2e.test`;
 
 test.describe.serial("student journey", () => {
-  test.beforeAll(resetRateLimits);
+  test.beforeAll(async () => {
+    await resetRateLimits();
+    await setRegistrationMode("email");
+  });
+  test.afterAll(() => setRegistrationMode("approval"));
+
+  test("approval mode: a new sign-up waits for an admin before it can sign in", async ({ page }) => {
+    await setRegistrationMode("approval");
+    const pending = `pending-${Date.now()}@e2e.test`;
+    await page.goto("/register");
+    await page.getByLabel("First name").fill("Mona");
+    await page.getByLabel("Last name").fill("Adel");
+    await page.getByLabel("Email address").fill(pending);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page).toHaveURL(/verify-email\?pending=1/);
+    expect((await db.user.findUnique({ where: { email: pending } }))?.status).toBe("PENDING");
+    await setRegistrationMode("email");
+  });
 
   test("register, verify email, login", async ({ page }) => {
     await page.goto("/register");

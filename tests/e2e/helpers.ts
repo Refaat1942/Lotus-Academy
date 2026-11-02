@@ -60,3 +60,7 @@ export async function completeLessonUI(page: Page, userEmail: string, courseSlug
     await page.getByText("Completed", { exact: true }).first().waitFor();
   }
 }
+
+export async function setRegistrationMode(mode: "email" | "approval" | "closed") {
+  await db.systemSetting.upsert({ where: { key: "registration.mode" }, update: { value: mode }, create: { key: "registration.mode", value: mode } });
+}
