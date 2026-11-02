@@ -7,11 +7,13 @@ import AdmZip from "adm-zip";
 import { detectDuplicates, readArchive } from "./run";
 import { isUsableQuestion, parseLesson, parseOverview, parseQuiz } from "./parse";
 
-const SRC = path.resolve(__dirname, "../../../content/sources");
-const all = fs.readdirSync(SRC).filter((f) => f.endsWith(".zip")).sort();
-// Original uploaded curriculum (courses 01-08) vs. the bilingual authored courses (09+).
-const archives = all.filter((f) => /^Course-0[1-8]-/.test(f)).map((f) => readArchive(path.join(SRC, f)));
-const authored = all.filter((f) => /^Course-(09|1\d)-/.test(f)).map((f) => readArchive(path.join(SRC, f)));
+// Legacy-format archives as originally uploaded (kept as importer fixtures).
+const SRC = path.resolve(__dirname, "../../../content/originals");
+const zips = (dir: string) => fs.readdirSync(dir).filter((f) => f.endsWith(".zip")).sort();
+const archives = zips(SRC).map((f) => readArchive(path.join(SRC, f)));
+// Packed bilingual courses (npm run pack:courses) — the ones actually imported.
+const PACKED = path.resolve(__dirname, "../../../content/sources");
+const authored = zips(PACKED).map((f) => readArchive(path.join(PACKED, f)));
 
 describe("importer: source archives", () => {
   it("reads all 7 distinct course archives", () => {
@@ -40,8 +42,8 @@ describe("importer: source archives", () => {
 });
 
 describe("importer: bilingual authored courses", () => {
-  it("has 7 packed courses, each with Arabic overview, exams, and per-lesson Arabic + video scripts", () => {
-    expect(authored.map((a) => a.courseCode)).toEqual(["EG-RET-01", "EG-COM-01", "EG-RET-02", "EG-RET-03", "EG-DRM-01", "EG-DRM-02", "EG-DRM-03"]);
+  it("has 14 packed courses, each with Arabic overview, exams, and per-lesson Arabic + video scripts", () => {
+    expect(authored.map((a) => a.courseCode)).toEqual(["EG-MED-01", "EG-MED-02", "EG-MED-03", "EG-MED-04", "EG-MED-05", "EG-MED-07", "EG-MED-08", "EG-RET-01", "EG-COM-01", "EG-RET-02", "EG-RET-03", "EG-DRM-01", "EG-DRM-02", "EG-DRM-03"]);
     for (const a of authored) {
       const names = [...a.files.keys()].map((n) => n.split("/").slice(2).join("/"));
       expect(names, a.fileName).toEqual(expect.arrayContaining(["course-overview.md", "course-overview.ar.md", "final-exam.md", "final-exam.ar.md"]));
