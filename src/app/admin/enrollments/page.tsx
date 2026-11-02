@@ -4,7 +4,7 @@ import { getT } from "@/i18n";
 import { AdminTitle, Table, Td, hrefWith } from "@/components/admin";
 import { Badge, Pagination } from "@/components/ui";
 import { ConfirmAction } from "@/components/ConfirmAction";
-import { cancelEnrollmentAction } from "@/app/actions/admin";
+import { cancelEnrollmentAction, resetAttemptsAction } from "@/app/actions/admin";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,9 @@ export default async function Enrollments({ searchParams }: { searchParams: Prom
         {rows.map((e) => (
           <tr key={e.id}><Td>{e.user.firstName} {e.user.lastName}<div className="text-xs text-muted">{e.user.email}</div></Td><Td>{e.course.titleEn}</Td><Td className="text-muted">{e.enrolledAt.toLocaleDateString()}</Td>
             <Td>{pm.get(`${e.userId}:${e.courseId}`) ?? 0}%</Td><Td><Badge tone={e.status === "COMPLETED" ? "success" : e.status === "ACTIVE" ? "primary" : "neutral"}>{e.status}</Badge></Td>
-            <Td>{me.permissions.has("enrollments.write") && e.status !== "CANCELLED" && <ConfirmAction action={cancelEnrollmentAction} fields={{ id: e.id }} label="Cancel" message="Cancel this enrollment? The learner loses access (progress is kept)." danger />}</Td></tr>
+            <Td>{me.permissions.has("enrollments.write") && e.status !== "CANCELLED" && <div className="flex flex-wrap gap-2">
+              {e.status !== "COMPLETED" && <ConfirmAction action={resetAttemptsAction} fields={{ id: e.id }} label="Reset attempts" message="Clear this learner's failed exam attempts in this course so they can try again?" />}
+              <ConfirmAction action={cancelEnrollmentAction} fields={{ id: e.id }} label="Cancel" message="Cancel this enrollment? The learner loses access (progress is kept)." danger /></div>}</Td></tr>
         ))}
       </Table>
       <Pagination page={page} pages={Math.max(1, Math.ceil(total / SIZE))} hrefFor={(p) => hrefWith("/admin/enrollments", sp, { page: String(p) })} label="Enrollments pagination" />

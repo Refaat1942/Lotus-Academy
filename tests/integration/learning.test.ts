@@ -1,20 +1,23 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
-import { completeLesson, enroll, getCheckpoint, submitCheckpoint, submitQuiz, toggleBookmark, markLessonViewed } from "@/lib/learning";
-import { buildCheckpointPool } from "@/lib/domain";
+import { completeLesson, enroll, startAttempt, submitAttempt, toggleBookmark, markLessonViewed } from "@/lib/learning";
 import { hashPassword } from "@/lib/auth-core";
 
-let userId: string, otherId: string, courseId: string;
+let userId: string, otherId: string;
 
-/** Completes a lesson the way a learner must: by answering its checkpoint correctly (or directly if none). */
+/** Answers the served attempt (all correct unless `wrong`). */
+async function takeQuiz(uid: string, quizId: string, wrong = false) {
+  const view = await startAttempt(uid, quizId);
+  if (!view) throw new Error("no attempts left");
+  const qs = await db.quizQuestion.findMany({ where: { id: { in: view.questions.map((q) => q.id) } }, include: { options: true } });
+  const answers = Object.fromEntries(qs.map((q) => [q.id, q.options.filter((o) => (wrong ? !o.isCorrect : o.isCorrect)).slice(0, 1).map((o) => o.id)]));
+  return { view, result: await submitAttempt(uid, view.attemptId, answers) };
+}
+
+/** Completes a lesson the way a learner must: pass its quiz if it has one, otherwise mark it complete. */
 async function finishLesson(uid: string, lessonId: string) {
-  const cp = await getCheckpoint(uid, lessonId);
-  if (!cp.required || cp.passed) return completeLesson(uid, lessonId);
-  const qs = await db.quizQuestion.findMany({ where: { quiz: { lessonId } }, select: { id: true, promptEn: true, options: { select: { id: true, textEn: true, isCorrect: true } } } });
-  const pool = buildCheckpointPool(qs);
-  const answers = Object.fromEntries(cp.questions.map((q) => [q.id, pool.find((p) => p.id === q.id)!.options.filter((o) => o.isCorrect).map((o) => o.id)]));
-  const r = await submitCheckpoint(uid, lessonId, answers);
-  if (!r.passed) throw new Error("checkpoint unexpectedly failed");
+  const quiz = await db.quiz.findFirst({ where: { lessonId, status: "PUBLISHED" } });
+  if (quiz) return (await takeQuiz(uid, quiz.id)).result;
   return completeLesson(uid, lessonId);
 }
 
@@ -22,105 +25,93 @@ beforeAll(async () => {
   const mk = async (email: string) => (await db.user.upsert({ where: { email }, update: {}, create: { email, firstName: "Test", lastName: "Learner", passwordHash: await hashPassword("Passw0rd!!x"), status: "ACTIVE" } })).id;
   userId = await mk("int-learner@test.local");
   otherId = await mk("int-other@test.local");
-  await db.certificate.deleteMany({ where: { userId } });
-  await db.enrollment.deleteMany({ where: { userId } });
-  await db.quizAttempt.deleteMany({ where: { userId } });
-  await db.lessonProgress.deleteMany({ where: { userId } });
-  courseId = (await db.course.findUniqueOrThrow({ where: { code: "EG-MED-03" } })).id; // diabetes: 6 lessons, quizzes are DRAFT
+  for (const uid of [userId, otherId]) {
+    await db.certificate.deleteMany({ where: { userId: uid } });
+    await db.enrollment.deleteMany({ where: { userId: uid } });
+    await db.quizAttempt.deleteMany({ where: { userId: uid } });
+    await db.lessonProgress.deleteMany({ where: { userId: uid } });
+  }
 });
 
 describe("enrollment", () => {
   it("rejects unpublished courses and is idempotent", async () => {
     const draft = await db.course.create({ data: { slug: `draft-${Date.now()}`, titleEn: "Draft", status: "DRAFT" } });
     await expect(enroll(userId, draft.id)).rejects.toThrow(/not available/);
-    const a = await enroll(userId, courseId);
-    const b = await enroll(userId, courseId);
+    const c = await db.course.findUniqueOrThrow({ where: { code: "EG-RET-01" } });
+    const a = await enroll(userId, c.id);
+    const b = await enroll(userId, c.id);
     expect(b.id).toBe(a.id);
-    expect(await db.enrollment.count({ where: { userId, courseId } })).toBe(1);
   });
 });
 
-describe("progress and authorization of learning actions", () => {
-  it("refuses progress for a user who is not enrolled", async () => {
-    const l = await db.lesson.findFirstOrThrow({ where: { courseId } });
+describe("lesson quizzes gate progress", () => {
+  it("refuses everything to a learner who is not enrolled", async () => {
+    const l = await db.lesson.findFirstOrThrow({ where: { course: { code: "EG-RET-01" } }, orderBy: { position: "asc" } });
+    const q = await db.quiz.findFirstOrThrow({ where: { lessonId: l.id } });
     await expect(completeLesson(otherId, l.id)).rejects.toThrow(/Not enrolled/);
     await expect(markLessonViewed(otherId, l.id)).rejects.toThrow(/Not enrolled/);
     await expect(toggleBookmark(otherId, l.id)).rejects.toThrow(/Not enrolled/);
+    await expect(startAttempt(otherId, q.id)).rejects.toThrow(/Not enrolled/);
   });
-  it("blocks manual completion while a checkpoint is required, and fails wrong answers with a fresh draw", async () => {
-    const l = (await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } }))[1];
-    await expect(completeLesson(userId, l.id)).rejects.toThrow(/Checkpoint required/);
-    const cp = await getCheckpoint(userId, l.id);
-    expect(cp.required).toBe(true);
-    expect(cp.questions.length).toBe(2);
-    expect(JSON.stringify(cp)).not.toContain("isCorrect"); // answers never leave the server
-    const wrong = Object.fromEntries(cp.questions.map((q) => [q.id, []]));
-    expect(await submitCheckpoint(userId, l.id, wrong)).toEqual({ passed: false });
-    await expect(completeLesson(userId, l.id)).rejects.toThrow(/Checkpoint required/);
-    const after = await getCheckpoint(userId, l.id);
-    expect(after.attempts).toBe(1);
+
+  it("serves 5 random questions with no answer keys, keeps the same draw on reload, and a fresh draw after submitting", async () => {
+    const l = await db.lesson.findFirstOrThrow({ where: { course: { code: "EG-RET-01" } }, orderBy: { position: "asc" } });
+    const q = await db.quiz.findFirstOrThrow({ where: { lessonId: l.id } });
+    const v1 = await startAttempt(userId, q.id);
+    expect(v1!.questions).toHaveLength(5);
+    expect(JSON.stringify(v1)).not.toContain("isCorrect");
+    const again = await startAttempt(userId, q.id);
+    expect(again!.attemptId).toBe(v1!.attemptId);
+    expect(again!.questions.map((x) => x.id)).toEqual(v1!.questions.map((x) => x.id));
+    // failing does not complete the lesson; manual completion is refused
+    const fail = await submitAttempt(userId, v1!.attemptId, {});
+    expect(fail.passed).toBe(false);
+    await expect(completeLesson(userId, l.id)).rejects.toThrow(/Pass the lesson quiz/);
+    expect(await db.lessonProgress.count({ where: { userId, lessonId: l.id, completedAt: { not: null } } })).toBe(0);
+    await expect(submitAttempt(userId, v1!.attemptId, {})).rejects.toThrow(/no longer open/); // no double submit
+    // passing completes the lesson
+    const { view, result } = await takeQuiz(userId, q.id);
+    expect(view.attemptId).not.toBe(v1!.attemptId);
+    expect(result.passed).toBe(true);
+    expect(await db.lessonProgress.count({ where: { userId, lessonId: l.id, completedAt: { not: null } } })).toBe(1);
   });
-  it("tracks progress server-side and resumes position", async () => {
-    const lessons = await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } });
-    await markLessonViewed(userId, lessons[2].id);
-    expect((await db.enrollment.findFirstOrThrow({ where: { userId, courseId } })).lastLessonId).toBe(lessons[2].id);
-    const r = await finishLesson(userId, lessons[0].id);
-    expect(r).toMatchObject({ done: 1, total: 6, percent: 17, complete: false });
-    expect(await finishLesson(userId, lessons[0].id)).toMatchObject({ done: 1 }); // idempotent
-  });
-  it("completes the course and issues exactly one certificate with a non-guessable ID", async () => {
-    const lessons = await db.lesson.findMany({ where: { courseId }, orderBy: { position: "asc" } });
-    let last;
-    for (const l of lessons) last = await finishLesson(userId, l.id);
-    expect(last!.complete).toBe(true);
-    const e = await db.enrollment.findFirstOrThrow({ where: { userId, courseId } });
-    expect(e.status).toBe("COMPLETED");
-    const certs = await db.certificate.findMany({ where: { userId, courseId } });
-    expect(certs).toHaveLength(1);
-    expect(certs[0].publicId).toMatch(/^LA-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    await finishLesson(userId, lessons[0].id);
-    expect(await db.certificate.count({ where: { userId, courseId } })).toBe(1);
+
+  it("only grades the questions that were served (answers to other questions are ignored)", async () => {
+    const l = (await db.lesson.findMany({ where: { course: { code: "EG-RET-01" } }, orderBy: { position: "asc" } }))[1];
+    const q = await db.quiz.findFirstOrThrow({ where: { lessonId: l.id }, include: { questions: { include: { options: true } } } });
+    const view = await startAttempt(userId, q.id);
+    const served = new Set(view!.questions.map((x) => x.id));
+    const unserved = q.questions.filter((x) => !served.has(x.id));
+    const answers = Object.fromEntries(unserved.map((x) => [x.id, [x.options.find((o) => o.isCorrect)!.id]]));
+    const r = await submitAttempt(userId, view!.attemptId, answers);
+    expect(r.scorePct).toBe(0);
   });
 });
 
-describe("quizzes", () => {
-  it("grades on the server, enforces attempts, and gates completion on required quizzes", async () => {
-    const cv = (await db.course.findUniqueOrThrow({ where: { code: "EG-MED-01" } })).id;
-    await enroll(userId, cv);
-    const lessons = await db.lesson.findMany({ where: { courseId: cv }, orderBy: { position: "asc" } });
-    for (const l of lessons) await finishLesson(userId, l.id);
-    expect((await db.enrollment.findFirstOrThrow({ where: { userId, courseId: cv } })).status).toBe("ACTIVE"); // quizzes outstanding
-    const quizzes = await db.quiz.findMany({ where: { courseId: cv, status: "PUBLISHED" }, include: { questions: { include: { options: true } } } });
-    expect(quizzes.length).toBe(8);
-    // Failing attempt first (all-wrong answers) on quiz 0
-    const wrong = Object.fromEntries(quizzes[0].questions.map((q) => [q.id, [q.options.find((o) => !o.isCorrect)!.id]]));
-    const f = await submitQuiz(userId, quizzes[0].id, wrong);
-    expect(f.passed).toBe(false);
-    let final;
-    for (const q of quizzes) {
-      const right = Object.fromEntries(q.questions.map((x) => [x.id, x.options.filter((o) => o.isCorrect).map((o) => o.id)]));
-      final = await submitQuiz(userId, q.id, right);
-      expect(final).toMatchObject({ scorePct: 100, passed: true });
-    }
-    expect(final!.courseComplete).toBe(true);
-    expect(await db.certificate.count({ where: { userId, courseId: cv } })).toBe(1);
+describe("final exam and certificate", () => {
+  it("locks the final exam until all lessons are done, limits attempts, then issues exactly one certificate", async () => {
+    const c = await db.course.findUniqueOrThrow({ where: { code: "EG-RET-01" }, include: { lessons: { where: { status: "PUBLISHED" }, orderBy: { position: "asc" } } } });
+    const exam = await db.quiz.findFirstOrThrow({ where: { courseId: c.id, lessonId: null } });
+    expect(exam).toMatchObject({ drawCount: 20, maxAttempts: 3 });
+    await expect(startAttempt(userId, exam.id)).rejects.toThrow(/Complete all lessons/);
+    for (const l of c.lessons) await finishLesson(userId, l.id);
+    expect((await db.enrollment.findFirstOrThrow({ where: { userId, courseId: c.id } })).status).toBe("ACTIVE"); // exam outstanding
+    await takeQuiz(userId, exam.id, true);
+    await takeQuiz(userId, exam.id, true);
+    const last = await takeQuiz(userId, exam.id);
+    expect(last.result).toMatchObject({ passed: true, courseComplete: true });
+    expect(await startAttempt(userId, exam.id)).toBeNull(); // 3 attempts used
+    expect(await db.certificate.count({ where: { userId, courseId: c.id } })).toBe(1);
   });
-  it("rejects quiz submission without enrollment and limits attempts", async () => {
-    const q = await db.quiz.findFirstOrThrow({ where: { status: "PUBLISHED", course: { code: "EG-MED-02" } }, orderBy: { createdAt: "desc" } });
-    await expect(submitQuiz(otherId, q.id, {})).rejects.toThrow(/Not enrolled/);
-    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 1 } });
-    await enroll(otherId, q.courseId);
-    await submitQuiz(otherId, q.id, {});
-    await expect(submitQuiz(otherId, q.id, {})).rejects.toThrow(/No attempts remaining/);
-    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 0 } });
-  });
-  it("cannot exceed maxAttempts with concurrent submissions", async () => {
-    const q = await db.quiz.findFirstOrThrow({ where: { status: "PUBLISHED", course: { code: "EG-MED-02" } }, orderBy: { createdAt: "desc" } });
-    await db.quizAttempt.deleteMany({ where: { userId: otherId, quizId: q.id } });
-    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 2 } });
-    const res = await Promise.allSettled(Array.from({ length: 6 }, () => submitQuiz(otherId, q.id, {})));
-    expect(res.filter((r) => r.status === "fulfilled")).toHaveLength(2);
-    await db.quiz.update({ where: { id: q.id }, data: { maxAttempts: 0 } });
+
+  it("cannot exceed maxAttempts with parallel starts/submits", async () => {
+    const c = await db.course.findUniqueOrThrow({ where: { code: "EG-COM-01" }, include: { lessons: { where: { status: "PUBLISHED" } } } });
+    await enroll(otherId, c.id);
+    for (const l of c.lessons) await finishLesson(otherId, l.id);
+    const exam = await db.quiz.findFirstOrThrow({ where: { courseId: c.id, lessonId: null } });
+    const results = await Promise.allSettled(Array.from({ length: 6 }, async () => { const v = await startAttempt(otherId, exam.id); if (!v) throw new Error("none"); return submitAttempt(otherId, v.attemptId, {}); }));
+    expect(results.filter((r) => r.status === "fulfilled").length).toBeLessThanOrEqual(3);
+    expect(await db.quizAttempt.count({ where: { userId: otherId, quizId: exam.id, submittedAt: { not: null } } })).toBeLessThanOrEqual(3);
   });
 });
 

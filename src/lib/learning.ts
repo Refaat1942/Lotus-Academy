@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { audit } from "./audit";
-import { computeCompletion, gradeQuiz, attemptsRemaining, buildCheckpointPool, drawCheckpoint, type PoolQuestion } from "./domain";
+import { computeCompletion, gradeQuiz, attemptsRemaining, drawQuestions, shuffle } from "./domain";
+import type { Prisma } from "@prisma/client";
 import { newCertificateId } from "./tokens";
 import { sendMail } from "./mail";
 import { env } from "./env";
@@ -37,8 +38,9 @@ async function requireActiveEnrollment(userId: string, courseId: string) {
 export async function recomputeCourse(userId: string, courseId: string) {
   const lessons = await db.lesson.findMany({ where: publishedLessonsWhere(courseId), select: { id: true } });
   const done = await db.lessonProgress.findMany({ where: { userId, courseId, completedAt: { not: null } }, select: { lessonId: true } });
+  // Lesson quizzes gate lesson completion; only course-level exams (lessonId = null) are separately required.
   const quizzes = await db.quiz.findMany({
-    where: { courseId, status: "PUBLISHED", required: true },
+    where: { courseId, status: "PUBLISHED", required: true, lessonId: null },
     select: { id: true, attempts: { where: { userId, passed: true }, select: { id: true }, take: 1 } },
   });
   const c = computeCompletion({
@@ -86,59 +88,16 @@ export async function markLessonViewed(userId: string, lessonId: string) {
   await db.enrollment.update({ where: { userId_courseId: { userId, courseId: lesson.courseId } }, data: { lastLessonId: lessonId } });
 }
 
-async function checkpointPool(lessonId: string): Promise<PoolQuestion[]> {
-  const qs = await db.quizQuestion.findMany({
-    where: { quiz: { lessonId } }, orderBy: { position: "asc" },
-    select: { id: true, promptEn: true, promptAr: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, textAr: true, isCorrect: true } } },
-  });
-  return buildCheckpointPool(qs);
+/** The published quiz of a lesson, if it has at least one usable question. */
+export async function lessonQuiz(lessonId: string) {
+  const q = await db.quiz.findFirst({ where: { lessonId, status: "PUBLISHED" }, include: { _count: { select: { questions: true } } } });
+  return q && q._count.questions > 0 ? q : null;
 }
 
-export interface CheckpointState {
-  required: boolean;
-  passed: boolean;
-  attempts: number;
-  /** Questions without the isCorrect flag (never sent to the browser). */
-  questions: { id: string; prompt: string; promptAr: string | null; multi: boolean; options: { id: string; text: string; textAr: string | null }[] }[];
-}
-
-/** Returns (drawing if needed) the learner's current checkpoint for a lesson. */
-export async function getCheckpoint(userId: string, lessonId: string): Promise<CheckpointState> {
+/** A lesson with a published quiz (and the "require quiz" switch on) is completed only by passing that quiz. */
+export async function lessonNeedsQuiz(lessonId: string) {
   const lesson = await db.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { requireCheckpoint: true } });
-  const none: CheckpointState = { required: false, passed: false, attempts: 0, questions: [] };
-  if (!lesson.requireCheckpoint) return none;
-  const pool = await checkpointPool(lessonId);
-  if (!pool.length) return none;
-  let row = await db.lessonCheckpoint.findUnique({ where: { userId_lessonId: { userId, lessonId } } });
-  if (row?.passedAt) return { required: true, passed: true, attempts: row.attempts, questions: [] };
-  const valid = new Set(pool.map((q) => q.id));
-  if (!row || !row.questionIds.length || !row.questionIds.every((id) => valid.has(id))) {
-    const ids = drawCheckpoint(pool, 2);
-    row = await db.lessonCheckpoint.upsert({ where: { userId_lessonId: { userId, lessonId } }, update: { questionIds: ids }, create: { userId, lessonId, questionIds: ids } });
-  }
-  const byId = new Map(pool.map((q) => [q.id, q]));
-  return {
-    required: true, passed: false, attempts: row.attempts,
-    questions: row.questionIds.map((id) => byId.get(id)!).map((q) => ({ id: q.id, prompt: q.prompt, promptAr: q.promptAr ?? null, multi: q.options.filter((o) => o.isCorrect).length > 1, options: q.options.map((o) => ({ id: o.id, text: o.text, textAr: o.textAr ?? null })) })),
-  };
-}
-
-/** Grades the drawn checkpoint. Every question must be right; on success the lesson is completed. On failure a fresh draw is made. */
-export async function submitCheckpoint(userId: string, lessonId: string, answers: Record<string, string[]>) {
-  const lesson = await db.lesson.findFirst({ where: { id: lessonId, status: "PUBLISHED", deletedAt: null } });
-  if (!lesson) throw new Error("Lesson not found");
-  await requireActiveEnrollment(userId, lesson.courseId);
-  const row = await db.lessonCheckpoint.findUnique({ where: { userId_lessonId: { userId, lessonId } } });
-  if (!row || !row.questionIds.length) throw new Error("No checkpoint in progress");
-  const pool = (await checkpointPool(lessonId)).filter((q) => row.questionIds.includes(q.id));
-  const graded = gradeQuiz(pool.map((q) => ({ id: q.id, points: 1, options: q.options })), answers, 100);
-  if (!graded.passed) {
-    await db.lessonCheckpoint.update({ where: { id: row.id }, data: { attempts: { increment: 1 }, questionIds: [] } });
-    return { passed: false };
-  }
-  await db.lessonCheckpoint.update({ where: { id: row.id }, data: { passedAt: new Date(), attempts: { increment: 1 } } });
-  await markLessonComplete(userId, lesson.id, lesson.courseId);
-  return { passed: true };
+  return lesson.requireCheckpoint && !!(await lessonQuiz(lessonId));
 }
 
 async function markLessonComplete(userId: string, lessonId: string, courseId: string) {
@@ -150,46 +109,106 @@ async function markLessonComplete(userId: string, lessonId: string, courseId: st
   return recomputeCourse(userId, courseId);
 }
 
-/** Manual completion is only allowed for lessons without a required checkpoint. */
+/** Manual completion is only allowed for reading lessons (no required quiz). */
 export async function completeLesson(userId: string, lessonId: string) {
   const lesson = await db.lesson.findFirst({ where: { id: lessonId, status: "PUBLISHED", deletedAt: null } });
   if (!lesson) throw new Error("Lesson not found");
   await requireActiveEnrollment(userId, lesson.courseId);
-  const cp = await getCheckpoint(userId, lessonId);
-  if (cp.required && !cp.passed) throw new Error("Checkpoint required");
+  if (await lessonNeedsQuiz(lessonId)) throw new Error("Pass the lesson quiz to complete this lesson");
   return markLessonComplete(userId, lessonId, lesson.courseId);
 }
 
-export async function submitQuiz(userId: string, quizId: string, submitted: Record<string, string[]>) {
-  const quiz = await db.quiz.findFirst({
+async function loadQuiz(quizId: string) {
+  return db.quiz.findFirst({
     where: { id: quizId, status: "PUBLISHED", course: { status: "PUBLISHED", deletedAt: null }, OR: [{ lessonId: null }, { lesson: { status: "PUBLISHED", deletedAt: null } }] },
-    include: { questions: { orderBy: { position: "asc" }, include: { options: true } } },
+    include: { questions: { orderBy: { position: "asc" }, include: { options: { orderBy: { position: "asc" } } } } },
   });
+}
+
+async function assertFinalExamOpen(userId: string, courseId: string) {
+  const [total, done] = await Promise.all([
+    db.lesson.count({ where: publishedLessonsWhere(courseId) }),
+    db.lessonProgress.count({ where: { userId, courseId, completedAt: { not: null }, lesson: { status: "PUBLISHED", deletedAt: null } } }),
+  ]);
+  if (done < total) throw new Error("Complete all lessons before the final exam");
+}
+
+export interface AttemptView {
+  attemptId: string;
+  quizId: string;
+  remaining: number | null;
+  /** Questions in the served order, options in the served order — never includes which option is correct. */
+  questions: { id: string; type: string; promptEn: string; promptAr: string | null; options: { id: string; textEn: string; textAr: string | null }[] }[];
+}
+
+/**
+ * Returns the learner's open attempt or starts a new one with a fresh random draw.
+ * Returns null when no attempts remain.
+ */
+export async function startAttempt(userId: string, quizId: string): Promise<AttemptView | null> {
+  const quiz = await loadQuiz(quizId);
   if (!quiz) throw new Error("Quiz not available");
   await requireActiveEnrollment(userId, quiz.courseId);
-  if (!quiz.lessonId) {
-    // Final exam: every published lesson must be completed first.
-    const [total, done] = await Promise.all([
-      db.lesson.count({ where: publishedLessonsWhere(quiz.courseId) }),
-      db.lessonProgress.count({ where: { userId, courseId: quiz.courseId, completedAt: { not: null }, lesson: { status: "PUBLISHED", deletedAt: null } } }),
-    ]);
-    if (done < total) throw new Error("Complete all lessons before the final exam");
-  }
-  const graded = gradeQuiz(quiz.questions, submitted, quiz.passMark);
-  // Serialize per user+quiz so concurrent submissions cannot exceed maxAttempts.
+  if (!quiz.lessonId) await assertFinalExamOpen(userId, quiz.courseId);
+  const used = await db.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null } } });
+  const remaining = attemptsRemaining(quiz.maxAttempts, used);
+  const valid = new Set(quiz.questions.map((q) => q.id));
+  // One open attempt per learner and quiz: serialise concurrent starts with a transaction-scoped advisory lock.
   const attempt = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId + ":" + quizId}))`;
-    const used = await tx.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null } } });
-    if (attemptsRemaining(quiz.maxAttempts, used) === 0) throw new Error("No attempts remaining");
-    return tx.quizAttempt.create({
-    data: {
-      userId, quizId, scorePct: graded.scorePct, passed: graded.passed, submittedAt: new Date(),
-      answers: { create: graded.results.map((r) => ({ questionId: r.questionId, optionIds: r.optionIds, isCorrect: r.isCorrect })) },
-    },
-    });
+    let open = await tx.quizAttempt.findFirst({ where: { userId, quizId, submittedAt: null }, orderBy: { startedAt: "desc" } });
+    if (open && (!open.questionIds.length || !open.questionIds.every((id) => valid.has(id)))) {
+      await tx.quizAttempt.delete({ where: { id: open.id } }); // bank changed since it was drawn
+      open = null;
+    }
+    if (open) return open;
+    if (remaining === 0) return null;
+    const ids = drawQuestions(quiz.questions.map((q) => q.id), quiz.drawCount);
+    const order = Object.fromEntries(quiz.questions.filter((q) => ids.includes(q.id)).map((q) => [q.id, shuffle(q.options.map((o) => o.id))]));
+    return tx.quizAttempt.create({ data: { userId, quizId, questionIds: ids, optionOrder: order as Prisma.InputJsonValue } });
   });
+  if (!attempt) return null;
+  const byId = new Map(quiz.questions.map((q) => [q.id, q]));
+  const order = (attempt.optionOrder ?? {}) as Record<string, string[]>;
+  return {
+    attemptId: attempt.id, quizId, remaining,
+    questions: attempt.questionIds.map((id) => byId.get(id)!).map((q) => {
+      const opts = new Map(q.options.map((o) => [o.id, o]));
+      const ids = (order[q.id] ?? q.options.map((o) => o.id)).filter((x) => opts.has(x));
+      return { id: q.id, type: q.type, promptEn: q.promptEn, promptAr: q.promptAr, options: ids.map((x) => { const o = opts.get(x)!; return { id: o.id, textEn: o.textEn, textAr: o.textAr }; }) };
+    }),
+  };
+}
+
+/** Grades an open attempt (only the questions that were served). Passing a lesson quiz completes the lesson. */
+export async function submitAttempt(userId: string, attemptId: string, submitted: Record<string, string[]>) {
+  const attempt = await db.quizAttempt.findFirst({ where: { id: attemptId, userId, submittedAt: null } });
+  if (!attempt) throw new Error("This attempt is no longer open");
+  const quiz = await loadQuiz(attempt.quizId);
+  if (!quiz) throw new Error("Quiz not available");
+  await requireActiveEnrollment(userId, quiz.courseId);
+  if (!quiz.lessonId) await assertFinalExamOpen(userId, quiz.courseId);
+  const served = new Set(attempt.questionIds);
+  const graded = gradeQuiz(quiz.questions.filter((q) => served.has(q.id)), submitted, quiz.passMark);
+  // Close the attempt exactly once and never beyond maxAttempts (serialised per learner + quiz).
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId + ":" + quiz.id}))`;
+    const used = await tx.quizAttempt.count({ where: { userId, quizId: quiz.id, submittedAt: { not: null } } });
+    if (attemptsRemaining(quiz.maxAttempts, used) === 0) throw new Error("No attempts remaining");
+    const closed = await tx.quizAttempt.updateMany({ where: { id: attempt.id, submittedAt: null }, data: { submittedAt: new Date(), scorePct: graded.scorePct, passed: graded.passed } });
+    if (closed.count !== 1) throw new Error("This attempt is no longer open");
+  });
+  await db.quizAnswer.createMany({ data: graded.results.map((r) => ({ attemptId: attempt.id, questionId: r.questionId, optionIds: r.optionIds, isCorrect: r.isCorrect })) });
+  if (graded.passed && quiz.lessonId) await markLessonComplete(userId, quiz.lessonId, quiz.courseId);
   const course = await recomputeCourse(userId, quiz.courseId);
   return { attemptId: attempt.id, scorePct: graded.scorePct, passed: graded.passed, courseComplete: course.complete };
+}
+
+/** Convenience used by tests/scripts: start (or resume) an attempt and submit it in one call. */
+export async function submitQuiz(userId: string, quizId: string, submitted: Record<string, string[]>) {
+  const view = await startAttempt(userId, quizId);
+  if (!view) throw new Error("No attempts remaining");
+  return submitAttempt(userId, view.attemptId, submitted);
 }
 
 export async function toggleBookmark(userId: string, lessonId: string) {

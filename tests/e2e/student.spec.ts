@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, answerCheckpoint, db, plantToken, resetRateLimits } from "./helpers";
+import { PASSWORD, answerOpenAttempt, completeLessonUI, db, plantToken, resetRateLimits } from "./helpers";
 
 const email = `student-${Date.now()}@e2e.test`;
 
@@ -41,72 +41,78 @@ test.describe.serial("student journey", () => {
     await expect(page.getByRole("heading", { name: /Welcome back, Sara/ })).toBeVisible();
   });
 
-  test("browse, search, enroll, learn, bookmark, complete lessons", async ({ page }) => {
+  test("browse, search, enroll, learn with lesson quizzes, final exam, certificate", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Email address").fill(email);
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/dashboard/);
 
-    await page.goto("/courses?q=diabetes");
-    await expect(page.getByRole("heading", { name: "Diabetes Medications in Egypt" })).toBeVisible();
-    await page.getByRole("link", { name: "Diabetes Medications in Egypt" }).first().click();
-    await expect(page.getByText("6 lessons").first()).toBeVisible();
+    const course = await db.course.findUniqueOrThrow({ where: { code: "EG-RET-02" } });
+    const lessons = await db.lesson.findMany({ where: { courseId: course.id, status: "PUBLISHED" }, orderBy: { position: "asc" } });
+    await page.goto("/courses?q=" + encodeURIComponent("Customer Experience"));
+    await page.getByRole("link", { name: course.titleEn }).first().click();
     await page.getByRole("button", { name: "Enroll now" }).click();
-    await expect(page).toHaveURL(/\/learn\/diabetes-medications-in-egypt\/lesson-01/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Diabetes Epidemiology");
+    await expect(page).toHaveURL(new RegExp(`/learn/${course.slug}/${lessons[0].slug}`));
 
     await page.getByRole("button", { name: "Bookmark" }).click();
     await expect(page.getByRole("button", { name: "Bookmarked" })).toBeVisible();
 
-    const lessons = await db.lesson.findMany({ where: { course: { slug: "diabetes-medications-in-egypt" } }, orderBy: { position: "asc" } });
-    // the next lesson is locked until the checkpoint is answered
+    // the next lesson stays locked until the lesson quiz is passed; there is no manual "complete" for quiz lessons
     await expect(page.getByRole("link", { name: "Next lesson" })).toHaveCount(0);
-    await answerCheckpoint(page, email, lessons[0].id);
-    await expect(page.getByText("Lesson completed")).toBeVisible();
-    await expect(page.getByText("17%").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mark as complete" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Start the lesson quiz" }).click();
+    const quiz1 = await db.quiz.findFirstOrThrow({ where: { lessonId: lessons[0].id } });
+    await expect(page.locator("fieldset")).toHaveCount(5); // 5 random questions per attempt
+    await answerOpenAttempt(page, email, quiz1.id, true);
+    await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
+    await page.getByRole("link", { name: "Back to lesson" }).click();
+    await expect(page.getByText("20%").first()).toBeVisible();
 
-    // leave mid-course, then resume from dashboard
+    // leave mid-course, then resume from the dashboard
     await page.getByRole("link", { name: "Next lesson" }).click();
-    await expect(page).toHaveURL(/lesson-02/);
+    await expect(page).toHaveURL(new RegExp(lessons[1].slug));
     await page.goto("/dashboard");
     await page.getByRole("link", { name: "Continue learning" }).click();
-    await expect(page).toHaveURL(/lesson-02/);
+    await expect(page).toHaveURL(new RegExp(lessons[1].slug));
 
-    for (let i = 1; i < 6; i++) {
-      await answerCheckpoint(page, email, lessons[i].id);
-      await expect(page.getByText("Lesson completed")).toBeVisible();
-      const next = page.getByRole("link", { name: "Next lesson" });
-      if (await next.count()) { await next.click(); await expect(page).toHaveURL(new RegExp(lessons[i + 1].slug)); }
-    }
-    await expect(page.getByText("You completed this course!")).toBeVisible();
-    await page.getByRole("link", { name: "View certificate" }).click();
+    for (const l of lessons.slice(1)) await completeLessonUI(page, email, course.slug, l.id);
+
+    // final exam unlocks after the last lesson, then the certificate is issued
+    await page.goto(`/courses/${course.slug}`);
+    await page.getByRole("link", { name: "Start the final exam" }).click();
+    const exam = await db.quiz.findFirstOrThrow({ where: { courseId: course.id, lessonId: null } });
+    await answerOpenAttempt(page, email, exam.id, true);
+    await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
+    const cert = await db.certificate.findFirstOrThrow({ where: { courseId: course.id, user: { email } } });
+    await page.goto(`/certificates/${cert.publicId}`);
     await expect(page.getByRole("heading", { name: "Certificate of Completion" })).toBeVisible();
     await expect(page.locator(".cert-sheet").getByText("Sara Ahmed")).toBeVisible();
-    await expect(page.locator(".cert-sheet").getByText("Diabetes Medications in Egypt")).toBeVisible();
+    await expect(page.locator(".cert-sheet").getByText(course.titleEn)).toBeVisible();
   });
 
-  test("quiz: take, fail, retry and pass", async ({ page }) => {
+  test("quiz: a failed attempt hides the answers; a retry draws new questions; passing reveals them", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Email address").fill(email);
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/dashboard/);
-    await page.goto("/courses/cardiovascular-medications-in-egypt");
+    const course = await db.course.findUniqueOrThrow({ where: { code: "EG-RET-01" } });
+    const lesson = await db.lesson.findFirstOrThrow({ where: { courseId: course.id }, orderBy: { position: "asc" } });
+    const quiz = await db.quiz.findFirstOrThrow({ where: { lessonId: lesson.id } });
+    await page.goto(`/courses/${course.slug}`);
     await page.getByRole("button", { name: "Enroll now" }).click();
-    await expect(page).toHaveURL(/lesson-01-hypertension/);
-    await page.goto("/learn/cardiovascular-medications-in-egypt/lesson-01-hypertension/quiz");
-    await page.getByRole("button", { name: "Submit answers" }).click(); // all blank → fail
+    await expect(page).toHaveURL(new RegExp(`/learn/${course.slug}/`)); // wait for the enrolment redirect
+    await page.goto(`/learn/${course.slug}/${lesson.slug}/quiz`);
+    await answerOpenAttempt(page, email, quiz.id, false);
     await expect(page.getByRole("heading", { name: "Not passed" })).toBeVisible();
+    await expect(page.getByText("Correct answers are shown once you pass")).toBeVisible();
+    await expect(page.locator("li.text-success.font-semibold")).toHaveCount(0); // no correct option revealed
     await page.getByRole("link", { name: "Try again" }).click();
-    const quiz = await db.quiz.findFirstOrThrow({ where: { lesson: { slug: "lesson-01-hypertension", course: { slug: "cardiovascular-medications-in-egypt" } } }, include: { questions: { include: { options: true } } } });
-    for (const q of quiz.questions) {
-      const correct = q.options.find((o) => o.isCorrect)!;
-      await page.locator(`input[name="q_${q.id}"][value="${correct.id}"]`).check();
-    }
-    await page.getByRole("button", { name: "Submit answers" }).click();
+    await answerOpenAttempt(page, email, quiz.id, true);
     await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
     await expect(page.getByText("100%").first()).toBeVisible();
+    await expect(page.locator("li.text-success.font-semibold")).toHaveCount(5); // answers revealed after passing
   });
 
   test("public certificate verification", async ({ page }) => {

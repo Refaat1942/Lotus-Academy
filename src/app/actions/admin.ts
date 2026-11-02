@@ -371,12 +371,13 @@ export async function updateQuizAction(_: State, fd: FormData): Promise<State> {
   await assertQuizAccess(user, id);
   const passMark = z.coerce.number().int().min(0).max(100).parse(fd.get("passMark"));
   const maxAttempts = z.coerce.number().int().min(0).max(100).parse(fd.get("maxAttempts"));
+  const drawCount = z.coerce.number().int().min(0).max(200).catch(0).parse(fd.get("drawCount"));
   if (status === "PUBLISHED") {
     const qs = await db.quizQuestion.findMany({ where: { quizId: id }, include: { options: true } });
     const bad = qs.filter((q) => q.options.length < 2 || !q.options.some((o) => o.isCorrect));
     if (!qs.length || bad.length) return { error: `Cannot publish: ${!qs.length ? "no questions" : `${bad.length} question(s) need at least 2 options and one correct answer`}.` };
   }
-  await db.quiz.update({ where: { id }, data: { status, passMark, maxAttempts, required: fd.get("required") === "on" } });
+  await db.quiz.update({ where: { id }, data: { status, passMark, maxAttempts, drawCount, required: fd.get("required") === "on" } });
   await audit(user.id, "quiz.update", "Quiz", id);
   revalidatePath("/admin/quizzes");
   return { ok: "Saved." };
@@ -478,6 +479,15 @@ export async function cancelEnrollmentAction(fd: FormData) {
   const id = String(fd.get("id"));
   await db.enrollment.update({ where: { id }, data: { status: "CANCELLED" } });
   await audit(user.id, "enrollment.cancel", "Enrollment", id);
+  revalidatePath("/admin/enrollments");
+}
+
+/** Clears a learner's FAILED exam attempts in a course so they can try again (passed attempts are kept). */
+export async function resetAttemptsAction(fd: FormData) {
+  const user = await assertPermission("enrollments.write");
+  const e = await db.enrollment.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+  const r = await db.quizAttempt.deleteMany({ where: { userId: e.userId, passed: false, quiz: { courseId: e.courseId } } });
+  await audit(user.id, "enrollment.reset_attempts", "Enrollment", e.id, { removed: r.count });
   revalidatePath("/admin/enrollments");
 }
 

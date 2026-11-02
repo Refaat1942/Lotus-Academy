@@ -30,19 +30,33 @@ export async function resetRateLimits() {
   await db.rateLimit.deleteMany({});
 }
 
-import { buildCheckpointPool } from "../../src/lib/domain";
 import type { Page } from "@playwright/test";
 
-/** Answers the lesson's current checkpoint correctly (or wrongly) by recomputing the pool from the DB. */
-export async function answerCheckpoint(page: Page, userEmail: string, lessonId: string, correct = true) {
-  await page.locator("#checkpoint").waitFor();
+/** Answers the currently open attempt shown on the page (correctly, or with wrong options). */
+export async function answerOpenAttempt(page: Page, userEmail: string, quizId: string, correct = true) {
+  await page.getByRole("button", { name: /Submit answers|إرسال الإجابات/ }).waitFor();
   const user = await db.user.findUniqueOrThrow({ where: { email: userEmail } });
-  const row = await db.lessonCheckpoint.findUniqueOrThrow({ where: { userId_lessonId: { userId: user.id, lessonId } } });
-  const qs = await db.quizQuestion.findMany({ where: { quiz: { lessonId } }, orderBy: { position: "asc" }, select: { id: true, promptEn: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, isCorrect: true } } } });
-  const pool = buildCheckpointPool(qs).filter((q) => row.questionIds.includes(q.id));
-  for (const q of pool) {
-    const picks = q.options.filter((o) => (correct ? o.isCorrect : !o.isCorrect)).slice(0, correct ? 9 : 1);
-    for (const o of picks) await page.locator(`input[name="q_${q.id}"][value="${o.id}"]`).check();
+  const attempt = await db.quizAttempt.findFirstOrThrow({ where: { userId: user.id, quizId, submittedAt: null }, orderBy: { startedAt: "desc" } });
+  const qs = await db.quizQuestion.findMany({ where: { id: { in: attempt.questionIds } }, include: { options: true } });
+  for (const q of qs) {
+    const o = q.options.find((x) => (correct ? x.isCorrect : !x.isCorrect))!;
+    await page.locator(`input[name="q_${q.id}"][value="${o.id}"]`).check();
   }
-  await page.getByRole("button", { name: /Submit answer/ }).click();
+  await page.getByRole("button", { name: /Submit answers|إرسال الإجابات/ }).click();
+}
+
+/** Completes a lesson through the UI: passes its quiz when it has one, otherwise marks it complete. */
+export async function completeLessonUI(page: Page, userEmail: string, courseSlug: string, lessonId: string) {
+  const lesson = await db.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  const quiz = await db.quiz.findFirst({ where: { lessonId, status: "PUBLISHED" } });
+  if (quiz && lesson.requireCheckpoint) {
+    await page.goto(`/learn/${courseSlug}/${lesson.slug}/quiz`);
+    await answerOpenAttempt(page, userEmail, quiz.id, true);
+    await page.getByRole("heading", { name: "Passed" }).waitFor();
+    await page.goto(`/learn/${courseSlug}/${lesson.slug}`);
+  } else {
+    await page.goto(`/learn/${courseSlug}/${lesson.slug}`);
+    await page.getByRole("button", { name: "Mark as complete" }).click();
+    await page.getByText("Completed", { exact: true }).first().waitFor();
+  }
 }

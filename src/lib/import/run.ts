@@ -297,7 +297,7 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
           const quiz = await tx.quiz.upsert({
             where: { lessonId: lesson.id },
             update: { titleEn: `${l.titleEn} — Quiz`, titleAr: p.ar?.titleEn ? `${p.ar.titleEn} — اختبار` : null, passMark: ov.passMark, status },
-            create: { courseId: course.id, lessonId: lesson.id, titleEn: `${l.titleEn} — Quiz`, titleAr: p.ar?.titleEn ? `${p.ar.titleEn} — اختبار` : null, passMark: ov.passMark, status },
+            create: { courseId: course.id, lessonId: lesson.id, titleEn: `${l.titleEn} — Quiz`, titleAr: p.ar?.titleEn ? `${p.ar.titleEn} — اختبار` : null, passMark: ov.passMark, status, drawCount: 5 },
           });
           await tx.quizQuestion.deleteMany({ where: { quizId: quiz.id } });
           await createQuestions(tx, quiz.id, qs);
@@ -311,7 +311,7 @@ async function importCourse(db: PrismaClient, a: ArchiveRecord, report: ImportRe
         const status = usableFinal.length >= MIN_PUBLISHABLE_QUESTIONS ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
         const existingFinal = await tx.quiz.findFirst({ where: { courseId: course.id, lessonId: null } });
         const data = { titleEn: "Final exam", titleAr: "الاختبار النهائي", passMark: ov.passMark, status, required: true };
-        const quiz = existingFinal ? await tx.quiz.update({ where: { id: existingFinal.id }, data }) : await tx.quiz.create({ data: { ...data, courseId: course.id } });
+        const quiz = existingFinal ? await tx.quiz.update({ where: { id: existingFinal.id }, data }) : await tx.quiz.create({ data: { ...data, courseId: course.id, drawCount: 20, maxAttempts: 3 } });
         await tx.quizQuestion.deleteMany({ where: { quizId: quiz.id } });
         await createQuestions(tx, quiz.id, status === ContentStatus.PUBLISHED ? usableFinal : fx);
         if (status === ContentStatus.PUBLISHED) quizzesPublished++; else quizzesDraft++;

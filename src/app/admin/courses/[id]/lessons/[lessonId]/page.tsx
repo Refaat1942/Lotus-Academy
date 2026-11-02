@@ -31,7 +31,7 @@ export default async function EditLesson({ params }: { params: Promise<{ id: str
                 <div><label className="label" htmlFor="status">Status</label><select id="status" name="status" defaultValue={l.status} className="input"><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
               </div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isPreview" defaultChecked={l.isPreview} /> Free preview lesson</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="requireCheckpoint" defaultChecked={l.requireCheckpoint} /> Require a “check your understanding” question before the learner can continue</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="requireCheckpoint" defaultChecked={l.requireCheckpoint} /> Learner must pass the lesson quiz to complete this lesson (if the lesson has a published quiz)</label>
               <div><label className="label" htmlFor="objectives">Learning objectives (one per line)</label><textarea id="objectives" name="objectives" rows={4} defaultValue={l.objectives.join("\n")} className="input" /></div>
               <div><label className="label" htmlFor="bodyMd">Content (Markdown)</label><textarea id="bodyMd" name="bodyMd" rows={22} defaultValue={l.bodyMd} className="input font-mono text-xs" /></div>
               <div><label className="label" htmlFor="objectivesAr">Learning objectives — Arabic (one per line)</label><textarea id="objectivesAr" name="objectivesAr" dir="rtl" rows={3} defaultValue={l.objectivesAr.join("\n")} className="input" /></div>

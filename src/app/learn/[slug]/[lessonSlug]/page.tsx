@@ -5,10 +5,10 @@ import { db } from "@/lib/db";
 import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { renderMarkdown } from "@/lib/markdown";
-import { getCheckpoint, markLessonViewed } from "@/lib/learning";
+import { lessonQuiz, markLessonViewed } from "@/lib/learning";
 import { isLessonUnlocked } from "@/lib/domain";
 import { themeVars } from "@/lib/category-theme";
-import { bookmarkAction, completeLessonAction, submitCheckpointAction } from "@/app/actions/learning";
+import { bookmarkAction, completeLessonAction } from "@/app/actions/learning";
 import { Progress, fmtDuration } from "@/components/ui";
 import { AssistantChat } from "@/components/AssistantChat";
 
@@ -51,14 +51,13 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   }
   await markLessonViewed(user.id, lesson.id);
 
-  const [courseProg, bookmark, quiz, videos, assets, attempts, checkpoint, finalExam] = await Promise.all([
+  const [courseProg, bookmark, quiz, videos, assets, attempts, finalExam] = await Promise.all([
     db.courseProgress.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }),
     db.bookmark.findUnique({ where: { userId_lessonId: { userId: user.id, lessonId: lesson.id } } }),
-    db.quiz.findFirst({ where: { lessonId: lesson.id, status: "PUBLISHED" }, include: { _count: { select: { questions: true } } } }),
+    lessonQuiz(lesson.id),
     db.video.findMany({ where: { lessonId: lesson.id, status: "READY" } }),
     db.lessonAsset.findMany({ where: { lessonId: lesson.id }, orderBy: { createdAt: "asc" } }),
     db.quizAttempt.findMany({ where: { userId: user.id, quiz: { lessonId: lesson.id }, submittedAt: { not: null } }, orderBy: { startedAt: "desc" }, take: 1 }),
-    done.has(lesson.id) ? null : getCheckpoint(user.id, lesson.id),
     db.quiz.findFirst({ where: { courseId: course.id, lessonId: null, status: "PUBLISHED" }, select: { id: true } }),
   ]);
   const useAr = locale === "ar" && !!lesson.bodyMdAr;
@@ -141,36 +140,27 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
             )}
           </div>
 
-          {checkpoint?.required && !checkpoint.passed && (
-            <section id="checkpoint" className="mt-8 overflow-hidden rounded-2xl border-2 bg-surface shadow-card" style={{ borderColor: "var(--accent)" }}>
-              <div className="flex items-center gap-3 px-6 py-4 text-white" style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-dark))" }}>
-                <ShieldQuestion size={22} aria-hidden /><div><h2 className="font-bold">Check your understanding</h2><p className="text-xs text-white/85">Answer correctly to complete this lesson and unlock the next.</p></div>
-              </div>
-              {sp.cp === "fail" && <p role="alert" className="border-b border-error/30 bg-error/10 px-6 py-3 text-sm text-error">Not quite. Review the lesson above and try these new questions.</p>}
-              <form action={submitCheckpointAction} className="space-y-6 p-6">
-                <input type="hidden" name="lessonId" value={lesson.id} /><input type="hidden" name="back" value={here} />
-                {checkpoint.questions.map((q, qi) => (
-                  <fieldset key={q.id}>
-                    <legend className="font-semibold" dir="auto"><span className="text-muted">{qi + 1}. </span>{pick(locale, q.prompt, q.promptAr)}</legend>
-                    <p className="mb-2 text-xs text-muted">{q.multi ? t("quiz.multi") : t("quiz.single")}</p>
-                    <div className="space-y-2">{q.options.map((o) => (
-                      <label key={o.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-sm transition-colors hover:bg-[var(--soft)] has-[:checked]:border-[var(--accent)] has-[:checked]:bg-[var(--soft)]">
-                        <input type={q.multi ? "checkbox" : "radio"} name={`q_${q.id}`} value={o.id} required={!q.multi} className="mt-1" /><span dir="auto">{pick(locale, o.text, o.textAr)}</span>
-                      </label>))}</div>
-                  </fieldset>
-                ))}
-                <button className="btn-primary" type="submit" style={{ background: "var(--accent)" }}>Submit answer{checkpoint.questions.length > 1 ? "s" : ""}</button>
-              </form>
-            </section>
-          )}
-          {sp.cp === "pass" && <p role="status" className="mt-6 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-medium text-success">Correct! Lesson completed{next ? ", next lesson unlocked." : "."}</p>}
-
-          {quiz && (
-            <section className="card mt-8 flex flex-wrap items-center justify-between gap-4 p-5">
-              <div><h2 className="font-bold">{t("quiz.title")}</h2><p className="text-sm text-muted">{quiz._count.questions} · {t("quiz.passMark")} {quiz.passMark}%{attempts[0] ? ` · ${t("quiz.score")}: ${attempts[0].scorePct}% (${attempts[0].passed ? t("quiz.passed") : t("quiz.failed")})` : ""}</p></div>
-              <Link className="btn-secondary" href={`${here}/quiz`}>{t("learn.quiz")}</Link>
-            </section>
-          )}
+          {quiz && (() => {
+            const needs = lesson.requireCheckpoint;
+            const served = quiz.drawCount > 0 ? Math.min(quiz.drawCount, quiz._count.questions) : quiz._count.questions;
+            const last = attempts[0];
+            return (
+              <section id="lesson-quiz" className="mt-8 overflow-hidden rounded-2xl border-2 bg-surface shadow-card" style={{ borderColor: lessonDone ? "rgb(var(--success))" : "var(--accent)" }}>
+                <div className="flex flex-wrap items-center justify-between gap-4 p-5">
+                  <div className="flex items-start gap-3">
+                    {lessonDone ? <CheckCircle2 size={24} className="mt-0.5 shrink-0 text-success" aria-hidden /> : <ShieldQuestion size={24} className="mt-0.5 shrink-0" style={{ color: "var(--accent)" }} aria-hidden />}
+                    <div>
+                      <h2 className="font-bold">{t("learn.lessonQuiz")}</h2>
+                      <p className="text-sm text-muted">{served} {t("learn.lessonQuiz.questions")} · {t("quiz.passMark")} {quiz.passMark}%{needs && !lessonDone ? ` · ${t("learn.lessonQuiz.required")}` : ""}</p>
+                      {last && !lessonDone && !last.passed && <p role="status" className="mt-1 text-sm text-error">{t("learn.lessonQuiz.lastFailed")} {last.scorePct}%</p>}
+                      {lessonDone && last?.passed && <p className="mt-1 text-sm text-success">{t("quiz.passed")} · {last.scorePct}%</p>}
+                    </div>
+                  </div>
+                  <Link className={lessonDone ? "btn-secondary" : "btn-primary"} href={`${here}/quiz`} style={lessonDone ? undefined : { background: "var(--accent)" }}>{lessonDone ? t("learn.lessonQuiz.practice") : last && !last.passed ? t("quiz.retry") : t("learn.lessonQuiz.start")}</Link>
+                </div>
+              </section>
+            );
+          })()}
           {!next && lessonDone && finalExam && !certificate && (
             <section className="mt-8 rounded-2xl border-2 p-5" style={{ borderColor: "var(--accent)", background: "var(--soft)" }}><h2 className="font-bold">{t("learn.finalExam")}</h2><p className="mt-1 text-sm text-muted">{t("learn.finalExam.desc")}</p><Link className="btn-primary mt-3" href={`/learn/${course.slug}/final-exam`} style={{ background: "var(--accent)" }}>{t("learn.finalExam.start")}</Link></section>
           )}
@@ -182,7 +172,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
             <div className="flex flex-wrap gap-2">
               <form action={bookmarkAction}><input type="hidden" name="lessonId" value={lesson.id} /><button className="btn-secondary" type="submit">{bookmark ? <BookmarkCheck size={16} aria-hidden /> : <Bookmark size={16} aria-hidden />}{bookmark ? t("learn.bookmarked") : t("learn.bookmark")}</button></form>
               {lessonDone ? <span className="btn-secondary !cursor-default text-success"><CheckCircle2 size={16} aria-hidden />{t("learn.completed")}</span>
-                : !checkpoint?.required ? <form action={completeLessonAction}><input type="hidden" name="lessonId" value={lesson.id} /><button className="btn-primary" type="submit">{t("learn.complete")}</button></form> : null}
+                : !(quiz && lesson.requireCheckpoint) ? <form action={completeLessonAction}><input type="hidden" name="lessonId" value={lesson.id} /><button className="btn-primary" type="submit">{t("learn.complete")}</button></form> : null}
             </div>
             <div className="flex gap-2">
               {prev && <Link className="btn-secondary" href={`/learn/${course.slug}/${prev.slug}`}><Prev size={16} aria-hidden />{t("learn.prev")}</Link>}

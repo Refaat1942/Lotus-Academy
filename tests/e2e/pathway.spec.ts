@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, answerCheckpoint, db, ensureUser, resetRateLimits } from "./helpers";
+import { PASSWORD, answerOpenAttempt, db, ensureUser, resetRateLimits } from "./helpers";
 
 const S1 = "path-student@e2e.test";
 const S2 = "path-other@e2e.test";
@@ -28,19 +28,26 @@ test.describe.serial("learning path, materials and assistant", () => {
     await db.enrollment.create({ data: { userId: u.id, courseId: c.id } });
   });
 
-  test("lessons unlock one by one and only a correct checkpoint answer unlocks the next", async ({ page }) => {
-    const lessons = await db.lesson.findMany({ where: { course: { code: "EG-MED-05" } }, orderBy: { position: "asc" }, include: { course: true } });
+  test("lessons unlock one by one and only passing the lesson quiz unlocks the next", async ({ page }) => {
+    const lessons = await db.lesson.findMany({ where: { course: { code: "EG-RET-03" } }, orderBy: { position: "asc" }, include: { course: true } });
+    const slug = lessons[0].course.slug;
+    const u = await db.user.findUniqueOrThrow({ where: { email: S1 } });
+    await db.enrollment.upsert({ where: { userId_courseId: { userId: u.id, courseId: lessons[0].courseId } }, update: { status: "ACTIVE" }, create: { userId: u.id, courseId: lessons[0].courseId } });
     await login(page, S1);
-    await page.goto(`/learn/${lessons[0].course.slug}/${lessons[1].slug}`);
+    await page.goto(`/learn/${slug}/${lessons[1].slug}`);
     await expect(page).toHaveURL(new RegExp(`${lessons[0].slug}\\?locked=1`)); // server redirects back
+    await page.goto(`/learn/${slug}/${lessons[1].slug}/quiz`);
+    await expect(page).toHaveURL(new RegExp(`${lessons[0].slug}\\?locked=1`)); // the quiz of a locked lesson is refused too
+    const quiz = await db.quiz.findFirstOrThrow({ where: { lessonId: lessons[0].id } });
+    await page.goto(`/learn/${slug}/${lessons[0].slug}/quiz`);
+    await answerOpenAttempt(page, S1, quiz.id, false);
+    await expect(page.getByRole("heading", { name: "Not passed" })).toBeVisible();
+    await page.goto(`/learn/${slug}/${lessons[0].slug}`);
     await expect(page.getByRole("link", { name: "Next lesson" })).toHaveCount(0);
-
-    await answerCheckpoint(page, S1, lessons[0].id, false);
-    await expect(page.locator('p[role="alert"]')).toContainText("Not quite");
-    await expect(page.getByRole("link", { name: "Next lesson" })).toHaveCount(0);
-
-    await answerCheckpoint(page, S1, lessons[0].id, true);
-    await expect(page.getByText("Lesson completed")).toBeVisible();
+    await page.goto(`/learn/${slug}/${lessons[0].slug}/quiz`);
+    await answerOpenAttempt(page, S1, quiz.id, true);
+    await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
+    await page.goto(`/learn/${slug}/${lessons[0].slug}`);
     await page.getByRole("link", { name: "Next lesson" }).click();
     await expect(page).toHaveURL(new RegExp(lessons[1].slug));
   });

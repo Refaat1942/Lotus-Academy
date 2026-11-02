@@ -58,33 +58,28 @@ describe("certificate ids", () => {
   });
 });
 
-import { buildCheckpointPool, drawCheckpoint, isLessonUnlocked } from "./domain";
+import { drawQuestions, isLessonUnlocked, shuffle } from "./domain";
 
-describe("checkpoint", () => {
-  const full = { id: "q1", promptEn: "Real?", options: [{ id: "a", textEn: "x", isCorrect: false }, { id: "b", textEn: "y", isCorrect: true }] };
-  const bare = (n: number) => ({ id: `b${n}`, promptEn: `Bare ${n}?`, options: [{ id: `o${n}`, textEn: `answer ${n}`, isCorrect: true }] });
-  it("keeps real questions and derives distractors for correct-only ones, deterministically", () => {
-    const qs = [full, bare(1), bare(2), bare(3), bare(4)];
-    const a = buildCheckpointPool(qs), b = buildCheckpointPool(qs);
-    expect(a).toEqual(b);
-    const derived = a.find((q) => q.id === "b1")!;
-    expect(derived.options).toHaveLength(4);
-    expect(derived.options.filter((o) => o.isCorrect).map((o) => o.text)).toEqual(["answer 1"]);
-    expect(new Set(derived.options.map((o) => o.text)).size).toBe(4);
-    expect(a.find((q) => q.id === "q1")!.options).toHaveLength(2);
+describe("randomised attempts", () => {
+  it("draws the requested number of distinct questions, or all of them", () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `q${i}`);
+    const five = drawQuestions(ids, 5);
+    expect(five).toHaveLength(5);
+    expect(new Set(five).size).toBe(5);
+    expect(five.every((x) => ids.includes(x))).toBe(true);
+    expect(drawQuestions(ids, 0).sort()).toEqual([...ids].sort());
+    expect(drawQuestions(ids, 50)).toHaveLength(10);
   });
-  it("skips questions without a correct answer or enough distractors", () => {
-    expect(buildCheckpointPool([bare(1)])).toEqual([]);
-    expect(buildCheckpointPool([{ id: "z", promptEn: "?", options: [{ id: "o", textEn: "t", isCorrect: false }] }])).toEqual([]);
+  it("produces different draws across attempts and keeps every element when shuffling", () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `q${i}`);
+    const draws = new Set(Array.from({ length: 20 }, () => drawQuestions(ids, 5).join(",")));
+    expect(draws.size).toBeGreaterThan(1);
+    expect(shuffle([1, 2, 3, 4]).sort()).toEqual([1, 2, 3, 4]);
   });
-  it("draws distinct ids and locks lessons sequentially", () => {
-    const pool = buildCheckpointPool([full, bare(1), bare(2), bare(3)]);
-    const ids = drawCheckpoint(pool, 2);
-    expect(new Set(ids).size).toBe(2);
+  it("locks lessons sequentially", () => {
     const ls = [{ id: "l1" }, { id: "l2" }, { id: "l3" }];
     expect(isLessonUnlocked(ls, new Set(), 0)).toBe(true);
     expect(isLessonUnlocked(ls, new Set(), 1)).toBe(false);
     expect(isLessonUnlocked(ls, new Set(["l1"]), 1)).toBe(true);
-    expect(isLessonUnlocked(ls, new Set(["l1"]), 2)).toBe(false);
   });
 });

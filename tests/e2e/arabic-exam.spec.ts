@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, db, ensureUser, resetRateLimits } from "./helpers";
+import { PASSWORD, answerOpenAttempt, db, ensureUser, resetRateLimits } from "./helpers";
 
 const EMAIL = "ar-learner@e2e.test";
 const CODE = "EG-RET-01";
@@ -56,11 +56,10 @@ test.describe.serial("Arabic lessons and final exam", () => {
     const exam = await db.quiz.findFirstOrThrow({ where: { courseId: c.id, lessonId: null }, include: { questions: { include: { options: true } } } });
     expect(exam.questions).toHaveLength(20);
     // a wrong attempt fails
-    await page.getByRole("button", { name: "Submit answers" }).click();
+    await answerOpenAttempt(page, EMAIL, exam.id, false);
     await expect(page.getByRole("heading", { name: "Not passed" })).toBeVisible();
     await page.goto(`/learn/${c.slug}/final-exam`);
-    for (const q of exam.questions) await page.locator(`input[name="q_${q.id}"][value="${q.options.find((o) => o.isCorrect)!.id}"]`).check();
-    await page.getByRole("button", { name: "Submit answers" }).click();
+    await answerOpenAttempt(page, EMAIL, exam.id, true);
     await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
     const e = await db.enrollment.findFirstOrThrow({ where: { userId: u.id, courseId: c.id } });
     expect(e.status).toBe("COMPLETED");

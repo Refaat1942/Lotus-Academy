@@ -1,15 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getT } from "@/i18n";
+import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
-import { attemptsRemaining } from "@/lib/domain";
+import { startAttempt } from "@/lib/learning";
 import { QuizTaker } from "@/components/QuizTaker";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinalExam({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { t } = await getT();
+  const { t, locale } = await getT();
   const user = await requireUser();
   const course = await db.course.findFirst({ where: { slug, status: "PUBLISHED", deletedAt: null } });
   if (!course) notFound();
@@ -20,11 +20,11 @@ export default async function FinalExam({ params }: { params: Promise<{ slug: st
     db.lessonProgress.count({ where: { userId: user.id, courseId: course.id, completedAt: { not: null }, lesson: { status: "PUBLISHED", deletedAt: null } } }),
   ]);
   if (done < total) redirect(`/courses/${slug}?exam=locked`); // server-enforced
-  const quiz = await db.quiz.findFirst({
-    where: { courseId: course.id, lessonId: null, status: "PUBLISHED" },
-    include: { questions: { orderBy: { position: "asc" }, select: { id: true, type: true, promptEn: true, promptAr: true, options: { orderBy: { position: "asc" }, select: { id: true, textEn: true, textAr: true } } } } },
-  });
+  const quiz = await db.quiz.findFirst({ where: { courseId: course.id, lessonId: null, status: "PUBLISHED" } });
   if (!quiz) notFound();
-  const history = await db.quizAttempt.findMany({ where: { userId: user.id, quizId: quiz.id, submittedAt: { not: null } }, orderBy: { startedAt: "desc" } });
-  return <QuizTaker quiz={quiz} backHref={`/courses/${slug}`} backLabel={t("common.back")} left={attemptsRemaining(quiz.maxAttempts, history.length)} history={history} />;
+  const [view, history] = await Promise.all([
+    startAttempt(user.id, quiz.id),
+    db.quizAttempt.findMany({ where: { userId: user.id, quizId: quiz.id, submittedAt: { not: null } }, orderBy: { startedAt: "desc" } }),
+  ]);
+  return <QuizTaker title={pick(locale, quiz.titleEn, quiz.titleAr)} passMark={quiz.passMark} view={view} backHref={`/courses/${slug}`} backLabel={t("common.back")} history={history} />;
 }

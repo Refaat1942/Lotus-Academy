@@ -416,6 +416,7 @@ model Quiz {
   titleAr       String?
   passMark      Int           @default(70)
   maxAttempts   Int           @default(0) // 0 = unlimited
+  drawCount     Int           @default(0) // questions served per attempt, drawn at random from the bank (0 = all)
   required      Boolean       @default(true) // required for course completion
   status        ContentStatus @default(DRAFT)
   sourceHash    String?
@@ -461,6 +462,8 @@ model QuizAttempt {
   quizId      String
   scorePct    Int       @default(0)
   passed      Boolean   @default(false)
+  questionIds String[]  @default([]) // the questions served in this attempt (random draw), in display order
+  optionOrder Json?     // { questionId: [optionId, ...] } shuffled order shown to the learner
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)

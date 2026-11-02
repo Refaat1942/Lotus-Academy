@@ -20,10 +20,11 @@ export default async function EditQuiz({ params }: { params: Promise<{ id: strin
       <AdminTitle title={q.titleEn} actions={<Link className="btn-secondary" href={`/admin/courses/${q.courseId}`}>← {q.course.titleEn}</Link>} />
       <section className="card mb-8 p-5">
         {can ? (
-          <ActionForm action={updateQuizAction} submitLabel="Save quiz settings" buttonClass="btn-primary" className="grid gap-4 sm:grid-cols-4">
+          <ActionForm action={updateQuizAction} submitLabel="Save quiz settings" buttonClass="btn-primary" className="grid gap-4 sm:grid-cols-5">
             <input type="hidden" name="id" value={q.id} />
             <div><label className="label" htmlFor="passMark">Pass mark (%)</label><input id="passMark" name="passMark" type="number" min={0} max={100} defaultValue={q.passMark} className="input" /></div>
             <div><label className="label" htmlFor="maxAttempts">Max attempts (0 = unlimited)</label><input id="maxAttempts" name="maxAttempts" type="number" min={0} defaultValue={q.maxAttempts} className="input" /></div>
+            <div><label className="label" htmlFor="drawCount">Questions per attempt (random, 0 = all {q.questions.length})</label><input id="drawCount" name="drawCount" type="number" min={0} max={q.questions.length} defaultValue={q.drawCount} className="input" /></div>
             <div><label className="label" htmlFor="status">Status</label><select id="status" name="status" defaultValue={q.status} className="input"><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
             <label className="flex items-center gap-2 self-end pb-3 text-sm"><input type="checkbox" name="required" defaultChecked={q.required} /> Required for completion</label>
           </ActionForm>
