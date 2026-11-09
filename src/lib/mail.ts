@@ -7,7 +7,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 export type Template =
   | "welcome" | "email_verification" | "password_reset" | "enrollment_confirmation"
-  | "course_completion" | "certificate_ready" | "admin_notification" | "course_update";
+  | "course_completion" | "certificate_ready" | "admin_notification" | "course_update"
+  | "training_reminder" | "manager_digest";
 
 /** Branded HTML shell shared by every transactional email. */
 function layout(title: string, bodyHtml: string, cta?: { label: string; url: string }) {
@@ -38,6 +39,10 @@ export function render(template: Template, p: Record<string, string>): { subject
       return { subject: `Your certificate: ${p.course}`, html: layout("Your certificate is ready", `<p>Hello ${name}, your certificate for <strong>${esc(p.course ?? "")}</strong> is ready (ID ${esc(p.certificateId ?? "")}).</p>`, { label: "View certificate", url: p.url }) };
     case "course_update":
       return { subject: `Course updated: ${p.course}`, html: layout("A course you follow was updated", `<p>${esc(p.course ?? "")} has new content.</p>`, { label: "Open course", url: p.url }) };
+    case "training_reminder":
+      return { subject: p.subject ?? "Training reminder — Lotus Academy", html: layout(p.subject ?? "Training reminder", `<p>Hello ${name},</p><p>${esc(p.message ?? "")}</p><p dir="rtl" style="font-size:14px;color:#405048">${esc(p.messageAr ?? "")}</p>`, { label: "Open my training", url: p.url }) };
+    case "manager_digest":
+      return { subject: p.subject ?? "Weekly team training summary", html: layout(p.subject ?? "Weekly team training summary", `<p>Hello ${name},</p><p>${esc(p.message ?? "")}</p><pre style="font-family:inherit;white-space:pre-wrap;font-size:14px;background:#f3f6f5;padding:12px;border-radius:6px">${esc(p.list ?? "")}</pre>`, { label: "Open my team", url: p.url }) };
     default:
       return { subject: p.subject ?? "Notification", html: layout(p.subject ?? "Notification", `<p>${esc(p.message ?? "")}</p>`) };
   }
@@ -46,6 +51,8 @@ export function render(template: Template, p: Record<string, string>): { subject
 /** Sends (or, if SMTP isn't configured, only logs) a transactional email. Never throws. */
 export async function sendMail(to: string, template: Template, params: Record<string, string>) {
   const { subject, html } = render(template, params);
+  // Demo/test accounts use reserved domains (RFC 2606) — never send to them.
+  if (/\.(invalid|test|example)$/i.test(to.split("@")[1] ?? "")) return false;
   const cfg = env.smtp();
   const rec = await db.emailLog.create({ data: { recipient: to, template, subject, provider: cfg.host ? "smtp" : "log-only" } });
   if (!cfg.host) {

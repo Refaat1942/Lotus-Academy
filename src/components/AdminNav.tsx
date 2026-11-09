@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Award, ClipboardCheck, Network, BarChart3, Bell, BookOpen, ClipboardList, GraduationCap, LayoutDashboard, Mail, Settings, ShieldCheck, Tags, UserCog, Users } from "lucide-react";
+import { Activity, Award, Route, Lightbulb, UsersRound, ClipboardCheck, Network, BarChart3, Bell, BookOpen, ClipboardList, GraduationCap, LayoutDashboard, Mail, Settings, ShieldCheck, Tags, UserCog, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-const ICONS: Record<string, LucideIcon> = { overview: LayoutDashboard, users: Users, students: GraduationCap, instructors: UserCog, courses: BookOpen, categories: Tags, quizzes: ClipboardList, certificates: Award, enrollments: Activity, reports: BarChart3, notifications: Bell, emails: Mail, audit: ShieldCheck, settings: Settings, audiences: Network, compliance: ClipboardCheck };
+const ICONS: Record<string, LucideIcon> = { overview: LayoutDashboard, users: Users, students: GraduationCap, instructors: UserCog, courses: BookOpen, categories: Tags, quizzes: ClipboardList, certificates: Award, enrollments: Activity, reports: BarChart3, notifications: Bell, emails: Mail, audit: ShieldCheck, settings: Settings, audiences: Network, compliance: ClipboardCheck, paths: Route, insights: Lightbulb, team: UsersRound };
 
 export interface NavGroup { label: string; items: { href: string; label: string; icon: string }[] }
 

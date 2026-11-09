@@ -1,6 +1,11 @@
 import type { MessageKey } from "./en";
 
 export const ar: Record<MessageKey, string> = {
+  "cert.expired": "الشهادة منتهية الصلاحية", "cert.expired.d": "كانت هذه الشهادة صالحة حتى", "cert.renewed": "تاريخ التجديد", "cert.validUntil": "صالحة حتى",
+  "admin.paths": "المسارات التعليمية", "admin.insights": "تحليلات التعلّم",
+  "learn.renewal": "تجديد الشهادة", "learn.renewal.desc": "تحتاج هذه الشهادة إلى تجديد. تبقى دروسك مكتملة — اجتز الامتحان النهائي مرة أخرى (بمحاولات جديدة) لتجديدها. الموعد:", "learn.renewal.start": "أعد الامتحان النهائي",
+  "nav.team": "فريقي", "nav.paths": "المسارات التعليمية", "nav.leaderboard": "لوحة الصدارة",
+  "auth.domainNotAllowed": "التسجيل متاح فقط بالبريد الإلكتروني الخاص بالشركة:",
   "search.placeholder": "أبحث عن دورة أو موضوع أو مجموعة دوائية…",
   "legal.copyright": "© صيدليات لوتس — أكاديمية لوتس. هذه المادة ملك لشركة لوتس ولا يجوز نسخها أو مشاركتها أو إعادة توزيعها دون إذن كتابي.",
   "learn.finalExam": "الاختبار النهائي", "learn.finalExam.desc": "لقد أتممت جميع الدروس. اجتز الاختبار النهائي لإنهاء الدورة والحصول على شهادتك.", "learn.finalExam.start": "ابدأ الاختبار النهائي",

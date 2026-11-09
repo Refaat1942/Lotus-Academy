@@ -100,6 +100,8 @@ model User {
   certificates     Certificate[]
   notifications    Notification[]
   auditLogs        AuditLog[]
+  pathEnrollments  PathEnrollment[]
+  dailyAnswers     DailyAnswer[]
 
   @@index([status])
   @@index([createdAt])
@@ -236,6 +238,7 @@ model Course {
   sortOrder        Int           @default(0)
   categoryId       String?
   sequential       Boolean       @default(true) // lessons unlock one after another
+  validityMonths   Int?          // certificate validity; null = never expires (renewal = retake the final exam)
   visibility       CourseVisibility @default(ALL)
   priceCents       Int           @default(0) // extension point: paid courses
   currency         String        @default("EGP")
@@ -259,6 +262,7 @@ model Course {
   tags        CourseTag[]
   quizzes     Quiz[]
   audiences   CourseAudience[]
+  paths       LearningPathCourse[]
 
   @@index([status, publishedAt])
   @@index([categoryId])
@@ -382,6 +386,7 @@ model Enrollment {
   lastLessonId String?
   source      String           @default("self") // "self" | "assigned" | extension: promo/org/payment
   dueAt       DateTime?        // set for mandatory (assigned) training
+  renewalSince DateTime?       // set while a certificate renewal is open: final-exam attempts count from here
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   @@unique([userId, courseId])
@@ -507,6 +512,8 @@ model Certificate {
   courseTitle   String
   issuedAt      DateTime  @default(now())
   revokedAt     DateTime?
+  expiresAt     DateTime? // from Course.validityMonths at issue/renewal
+  renewedAt     DateTime?
   verifiedCount Int       @default(0)
   user          User      @relation(fields: [userId], references: [id])
   course        Course    @relation(fields: [courseId], references: [id])
@@ -645,6 +652,7 @@ model Audience {
   createdAt DateTime         @default(now())
   users     User[]
   courses   CourseAudience[]
+  paths     LearningPath[]
 }
 
 model CourseAudience {
@@ -657,4 +665,68 @@ model CourseAudience {
   audience   Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
   @@id([courseId, audienceId])
   @@index([audienceId])
+}
+
+/// An ordered programme of courses (e.g. new-hire onboarding). Each course unlocks when the previous one is completed.
+model LearningPath {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  titleEn       String
+  titleAr       String?
+  descriptionEn String?
+  descriptionAr String?
+  audienceId    String?  // null = every job role
+  autoAssignNewHires Boolean @default(false) // enrol new/imported/activated staff automatically
+  dueDays       Int?     // days to complete the whole path after assignment
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  audience      Audience? @relation(fields: [audienceId], references: [id], onDelete: SetNull)
+  courses       LearningPathCourse[]
+  enrollments   PathEnrollment[]
+}
+
+model LearningPathCourse {
+  pathId    String
+  courseId  String
+  position  Int
+  path      LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  course    Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  @@id([pathId, courseId])
+  @@index([courseId])
+}
+
+model PathEnrollment {
+  id          String    @id @default(cuid())
+  userId      String
+  pathId      String
+  startedAt   DateTime  @default(now())
+  dueAt       DateTime?
+  completedAt DateTime?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  path        LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  @@unique([userId, pathId])
+}
+
+/// One row per reminder sent, keyed so the scheduler never sends the same reminder twice.
+model ReminderLog {
+  key       String   @id // e.g. due7:<enrollmentId>, digest:<userId>:2026-W45
+  userId    String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+/// "Question of the day": one answer per learner per day (spaced review of completed lessons).
+model DailyAnswer {
+  id         String   @id @default(cuid())
+  userId     String
+  day        String   // YYYY-MM-DD (Africa/Cairo)
+  questionId String
+  optionId   String?
+  correct    Boolean  @default(false)
+  answeredAt DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, day])
+  @@index([day])
 }

@@ -13,6 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "import:courses": "tsx scripts/import-courses.ts",
     "create:admin": "tsx scripts/create-admin.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "test:int": "vitest run --config vitest.int.config.ts",
     "test:e2e": "playwright test",
     "test:all": "vitest run && bash scripts/test-db.sh && vitest run --config vitest.int.config.ts && playwright test",
@@ -33,6 +34,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sanitize-html": "^2.18.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {

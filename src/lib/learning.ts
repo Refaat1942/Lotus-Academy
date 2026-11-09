@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { newCertificateId } from "./tokens";
 import { sendMail } from "./mail";
 import { env } from "./env";
+import { refreshPathCompletion } from "./paths";
 
 export const publishedLessonsWhere = (courseId: string) => ({ courseId, status: "PUBLISHED" as const, deletedAt: null });
 
@@ -45,9 +46,11 @@ export async function recomputeCourse(userId: string, courseId: string) {
   const lessons = await db.lesson.findMany({ where: publishedLessonsWhere(courseId), select: { id: true } });
   const done = await db.lessonProgress.findMany({ where: { userId, courseId, completedAt: { not: null } }, select: { lessonId: true } });
   // Lesson quizzes gate lesson completion; only course-level exams (lessonId = null) are separately required.
+  // During a certificate renewal only final-exam passes since the renewal opened count.
+  const since = await renewalSince(userId, courseId);
   const quizzes = await db.quiz.findMany({
     where: { courseId, status: "PUBLISHED", required: true, lessonId: null },
-    select: { id: true, attempts: { where: { userId, passed: true }, select: { id: true }, take: 1 } },
+    select: { id: true, attempts: { where: { userId, passed: true, ...(since ? { startedAt: { gte: since } } : {}) }, select: { id: true }, take: 1 } },
   });
   const c = computeCompletion({
     publishedLessonIds: lessons.map((l) => l.id),
@@ -63,21 +66,66 @@ export async function recomputeCourse(userId: string, courseId: string) {
   return c;
 }
 
+export async function renewalSince(userId: string, courseId: string) {
+  return (await db.enrollment.findUnique({ where: { userId_courseId: { userId, courseId } }, select: { renewalSince: true } }))?.renewalSince ?? null;
+}
+
+/** Certificate expiry for a course with a validity period (null = does not expire). */
+export function expiryFrom(validityMonths: number | null | undefined, from = new Date()) {
+  if (!validityMonths) return null;
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + validityMonths);
+  return d;
+}
+
+export type CertState = "valid" | "expiring" | "expired" | "revoked";
+export function certState(c: { revokedAt: Date | null; expiresAt: Date | null }, now = new Date()): CertState {
+  if (c.revokedAt) return "revoked";
+  if (!c.expiresAt) return "valid";
+  if (c.expiresAt < now) return "expired";
+  return c.expiresAt.getTime() - now.getTime() < 30 * 86400_000 ? "expiring" : "valid";
+}
+
+/**
+ * Opens a certificate renewal: the learner keeps lesson progress but must pass the final exam again
+ * (with a fresh set of attempts) before the due date. Idempotent.
+ */
+export async function openRenewal(userId: string, courseId: string, now = new Date()) {
+  const [e, cert] = await Promise.all([
+    db.enrollment.findUnique({ where: { userId_courseId: { userId, courseId } } }),
+    db.certificate.findUnique({ where: { userId_courseId: { userId, courseId } } }),
+  ]);
+  if (!e || !cert || e.renewalSince || e.status === "CANCELLED") return false;
+  const minDue = new Date(now.getTime() + 14 * 86400_000);
+  const dueAt = cert.expiresAt && cert.expiresAt > minDue ? cert.expiresAt : minDue;
+  await db.enrollment.update({ where: { id: e.id }, data: { renewalSince: now, status: "ACTIVE", dueAt } });
+  await recomputeCourse(userId, courseId);
+  return true;
+}
+
 async function completeCourse(userId: string, courseId: string) {
   const enrollment = await db.enrollment.findUnique({ where: { userId_courseId: { userId, courseId } } });
   if (!enrollment || enrollment.status === "COMPLETED") return;
   const [user, course] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: userId } }), db.course.findUniqueOrThrow({ where: { id: courseId } })]);
+  const now = new Date();
+  const renewing = !!enrollment.renewalSince;
   const cert = await db.$transaction(async (tx) => {
-    await tx.enrollment.update({ where: { id: enrollment.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+    await tx.enrollment.update({ where: { id: enrollment.id }, data: { status: "COMPLETED", completedAt: now, renewalSince: null } });
     const existing = await tx.certificate.findUnique({ where: { userId_courseId: { userId, courseId } } });
-    if (existing) return existing;
+    if (existing) {
+      if (!renewing) return existing;
+      const r = await tx.certificate.update({ where: { id: existing.id }, data: { renewedAt: now, expiresAt: expiryFrom(course.validityMonths, now), revokedAt: null } });
+      await tx.notification.create({ data: { userId, type: "certificate", title: `Certificate renewed: ${course.titleEn}`, href: `/certificates/${r.publicId}` } });
+      return r;
+    }
     const c = await tx.certificate.create({
-      data: { publicId: newCertificateId(), userId, courseId, recipientName: `${user.firstName} ${user.lastName}`.trim(), courseTitle: course.titleEn },
+      data: { publicId: newCertificateId(), userId, courseId, recipientName: `${user.firstName} ${user.lastName}`.trim(), courseTitle: course.titleEn, expiresAt: expiryFrom(course.validityMonths, now) },
     });
     await tx.notification.create({ data: { userId, type: "certificate", title: `Certificate ready: ${course.titleEn}`, href: `/certificates/${c.publicId}` } });
     return c;
   });
-  await audit(userId, "course.completed", "Course", courseId);
+  await audit(userId, renewing ? "certificate.renewed" : "course.completed", "Course", courseId);
+  await refreshPathCompletion(userId);
   void sendMail(user.email, "course_completion", { name: user.firstName, course: course.titleEn, url: `${env.appUrl()}/dashboard` });
   void sendMail(user.email, "certificate_ready", { name: user.firstName, course: course.titleEn, certificateId: cert.publicId, url: `${env.appUrl()}/certificates/${cert.publicId}` });
 }
@@ -156,15 +204,17 @@ export async function startAttempt(userId: string, quizId: string): Promise<Atte
   if (!quiz) throw new Error("Quiz not available");
   await requireActiveEnrollment(userId, quiz.courseId);
   if (!quiz.lessonId) await assertFinalExamOpen(userId, quiz.courseId);
-  const used = await db.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null } } });
+  const since = quiz.lessonId ? null : await renewalSince(userId, quiz.courseId);
+  const window = since ? { startedAt: { gte: since } } : {};
+  const used = await db.quizAttempt.count({ where: { userId, quizId, submittedAt: { not: null }, ...window } });
   const remaining = attemptsRemaining(quiz.maxAttempts, used);
   const valid = new Set(quiz.questions.map((q) => q.id));
   // One open attempt per learner and quiz: serialise concurrent starts with a transaction-scoped advisory lock.
   const attempt = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId + ":" + quizId}))`;
     let open = await tx.quizAttempt.findFirst({ where: { userId, quizId, submittedAt: null }, orderBy: { startedAt: "desc" } });
-    if (open && (!open.questionIds.length || !open.questionIds.every((id) => valid.has(id)))) {
-      await tx.quizAttempt.delete({ where: { id: open.id } }); // bank changed since it was drawn
+    if (open && (!open.questionIds.length || !open.questionIds.every((id) => valid.has(id)) || (since && open.startedAt < since))) {
+      await tx.quizAttempt.delete({ where: { id: open.id } }); // bank changed since it was drawn, or drawn before a renewal
       open = null;
     }
     if (open) return open;
@@ -199,7 +249,8 @@ export async function submitAttempt(userId: string, attemptId: string, submitted
   // Close the attempt exactly once and never beyond maxAttempts (serialised per learner + quiz).
   await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId + ":" + quiz.id}))`;
-    const used = await tx.quizAttempt.count({ where: { userId, quizId: quiz.id, submittedAt: { not: null } } });
+    const since = quiz.lessonId ? null : await renewalSince(userId, quiz.courseId);
+    const used = await tx.quizAttempt.count({ where: { userId, quizId: quiz.id, submittedAt: { not: null }, ...(since ? { startedAt: { gte: since } } : {}) } });
     if (attemptsRemaining(quiz.maxAttempts, used) === 0) throw new Error("No attempts remaining");
     const closed = await tx.quizAttempt.updateMany({ where: { id: attempt.id, submittedAt: null }, data: { submittedAt: new Date(), scorePct: graded.scorePct, passed: graded.passed } });
     if (closed.count !== 1) throw new Error("This attempt is no longer open");

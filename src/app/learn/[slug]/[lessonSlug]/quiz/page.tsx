@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { enforcePathOrder } from "@/lib/paths";
 import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { isLessonUnlocked } from "@/lib/domain";
@@ -19,6 +20,7 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
   if (idx === -1) notFound();
   const enr = await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } });
   if (!enr || enr.status === "CANCELLED") redirect(`/courses/${slug}`);
+  await enforcePathOrder(user.id, course.id);
   const done = new Set((await db.lessonProgress.findMany({ where: { userId: user.id, courseId: course.id, completedAt: { not: null } }, select: { lessonId: true } })).map((p) => p.lessonId));
   if (course.sequential && !isLessonUnlocked(course.lessons, done, idx)) redirect(`/learn/${slug}/${lessonSlug}`);
   const back = `/learn/${slug}/${lessonSlug}`;

@@ -8,12 +8,14 @@ import { getT, pick } from "@/i18n";
 import { getCurrentUser, isStaff } from "@/lib/auth";
 import { logoutAction } from "@/app/actions/auth";
 import { toggleLocaleAction } from "@/app/actions/locale";
+import { hasTeamView } from "@/lib/team";
 
 const navLink = "relative px-3 py-6 text-[15px] font-semibold text-text transition-colors after:absolute after:inset-x-3 after:bottom-4 after:h-0.5 after:origin-left after:scale-x-0 after:bg-primary after:transition-transform hover:text-primary hover:after:scale-x-100 focus-visible:after:scale-x-100 rtl:after:origin-right";
 
 export async function Header() {
   const { t, locale } = await getT();
   const user = await getCurrentUser();
+  const team = user ? await hasTeamView(user) : false;
   const categories = await db.courseCategory.findMany({ orderBy: { sortOrder: "asc" }, include: { courses: { where: { status: "PUBLISHED", deletedAt: null, visibility: "ALL" }, orderBy: { sortOrder: "asc" }, select: { slug: true, titleEn: true, titleAr: true }, take: 3 } } });
   const links = [["/categories", t("nav.categories")], ["/instructors", t("nav.instructors")], ["/about", t("nav.about")], ["/faq", t("nav.faq")], ["/contact", t("nav.contact")]] as const;
 
@@ -29,6 +31,9 @@ export async function Header() {
             <Link href="/verify/certificate" className="hover:underline">{t("cert.verifyTitle")}</Link>
             {user ? (
               <>
+                {team && <Link href="/team" className="hover:underline">{t("nav.team")}</Link>}
+                <Link href="/paths" className="hover:underline">{t("nav.paths")}</Link>
+                <Link href="/leaderboard" className="hover:underline">{t("nav.leaderboard")}</Link>
                 {isStaff(user) && <Link href="/admin" className="hover:underline">{t("nav.admin")}</Link>}
                 <Link href="/profile" className="hover:underline">{t("profile.title")}</Link>
                 <form action={logoutAction}><button type="submit" className="hover:underline">{t("nav.logout")}</button></form>
@@ -81,6 +86,9 @@ export async function Header() {
                 {user ? (
                   <>
                     <Link href="/dashboard" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("nav.dashboard")}</Link>
+                    {team && <Link href="/team" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("nav.team")}</Link>}
+                    <Link href="/paths" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("nav.paths")}</Link>
+                    <Link href="/leaderboard" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("nav.leaderboard")}</Link>
                     <Link href="/profile" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("profile.title")}</Link>
                     {isStaff(user) && <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-primary-light">{t("nav.admin")}</Link>}
                     <form action={logoutAction}><button className="w-full rounded-lg px-3 py-2 text-start hover:bg-primary-light" type="submit">{t("nav.logout")}</button></form>

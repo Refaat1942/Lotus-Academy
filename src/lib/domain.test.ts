@@ -83,3 +83,35 @@ describe("randomised attempts", () => {
     expect(isLessonUnlocked(ls, new Set(["l1"]), 1)).toBe(true);
   });
 });
+
+import { isoWeek } from "./reminders";
+import { cairoDay } from "./engagement";
+import { stepsFor } from "./paths";
+import { certState, expiryFrom } from "./learning";
+
+describe("engagement helpers", () => {
+  it("labels ISO weeks", () => {
+    expect(isoWeek(new Date(2026, 0, 1))).toBe("2026-W01");
+    expect(isoWeek(new Date(2026, 10, 9))).toBe("2026-W46");
+    expect(isoWeek(new Date(2027, 0, 1))).toBe("2026-W53");
+  });
+  it("uses the Egyptian calendar day", () => {
+    expect(cairoDay(new Date("2026-11-09T22:30:00Z"))).toBe("2026-11-10");
+    expect(cairoDay(new Date("2026-11-09T10:00:00Z"))).toBe("2026-11-09");
+  });
+  it("computes certificate expiry and state", () => {
+    const from = new Date(2026, 0, 15);
+    expect(expiryFrom(12, from)!.getFullYear()).toBe(2027);
+    expect(expiryFrom(null, from)).toBeNull();
+    const now = new Date(2026, 5, 1);
+    expect(certState({ revokedAt: null, expiresAt: null }, now)).toBe("valid");
+    expect(certState({ revokedAt: null, expiresAt: new Date(2026, 5, 20) }, now)).toBe("expiring");
+    expect(certState({ revokedAt: null, expiresAt: new Date(2026, 4, 20) }, now)).toBe("expired");
+    expect(certState({ revokedAt: now, expiresAt: null }, now)).toBe("revoked");
+  });
+  it("orders path steps: done, then the current course, then locked", () => {
+    const c = (id: string) => ({ courseId: id, course: { slug: id, titleEn: id, titleAr: null, durationMinutes: 60, category: null } });
+    const s = stepsFor([c("a"), c("b"), c("c")], new Set(["a"]), new Map([["b", 40]]));
+    expect(s.map((x) => [x.done, x.current, x.locked, x.percent])).toEqual([[true, false, false, 100], [false, true, false, 40], [false, false, true, 0]]);
+  });
+});

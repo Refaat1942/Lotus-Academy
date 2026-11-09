@@ -41,6 +41,7 @@ const courseSchema = z.object({
   durationMinutes: z.coerce.number().int().min(0).max(100000),
   passMark: z.coerce.number().int().min(0).max(100),
   sequential: z.string().optional(),
+  validityMonths: z.coerce.number().int().min(0).max(120).optional(),
   thumbnailUrl: z.string().trim().max(500).refine((v) => !v || /^(https:\/\/|\/(?![\/\\]))/.test(v), "Thumbnail must be an https URL or a /path").optional(),
 });
 
@@ -77,8 +78,12 @@ export async function updateCourseAction(_: State, fd: FormData): Promise<State>
       descriptionEn: d.descriptionEn || null, descriptionAr: d.descriptionAr || null,
       objectivesEn: lines(d.objectivesEn ?? ""), objectivesAr: lines(d.objectivesAr ?? ""), prerequisitesEn: d.prerequisitesEn || null,
       categoryId: d.categoryId || null, sequential: d.sequential === "on", level: d.level, durationMinutes: d.durationMinutes, passMark: d.passMark, thumbnailUrl: d.thumbnailUrl || null,
+      validityMonths: d.validityMonths || null,
     },
   });
+  // Keep existing certificates in line with the course's validity period.
+  if (d.validityMonths) await db.$executeRaw`UPDATE "Certificate" SET "expiresAt" = COALESCE("renewedAt", "issuedAt") + make_interval(months => ${d.validityMonths}::int) WHERE "courseId" = ${id}`;
+  else await db.certificate.updateMany({ where: { courseId: id }, data: { expiresAt: null } });
   await audit(user.id, "course.update", "Course", id);
   revalidatePath("/admin/courses");
   return { ok: "Saved." };
@@ -513,6 +518,9 @@ export async function saveSettingsAction(_: State, fd: FormData): Promise<State>
     set("contact.email", String(fd.get("contactEmail") ?? "").slice(0, 200)),
     set("certificate.issuer", { en: String(fd.get("issuerEn") ?? "").slice(0, 200), ar: String(fd.get("issuerAr") ?? "").slice(0, 200) }),
     set("registration.mode", ["email", "approval", "closed"].includes(String(fd.get("registrationMode"))) ? String(fd.get("registrationMode")) : "approval"),
+    set("registration.allowedDomains", String(fd.get("allowedDomains") ?? "").toLowerCase().replace(/[^a-z0-9.\-,@ ]/g, "").slice(0, 300)),
+    set("certificate.template", fd.get("certTemplate") === "classic" ? "classic" : "gold"),
+    set("certificate.signatories", [1, 2].map((i) => ({ name: String(fd.get(`sig${i}Name`) ?? "").trim().slice(0, 80), title: String(fd.get(`sig${i}Title`) ?? "").trim().slice(0, 80), titleAr: String(fd.get(`sig${i}TitleAr`) ?? "").trim().slice(0, 80) }))),
   ]);
   await audit(user.id, "settings.update", "SystemSetting");
   revalidatePath("/", "layout");

@@ -105,7 +105,8 @@ test.describe.serial("student journey", () => {
     await expect(page.getByRole("heading", { name: "Passed" })).toBeVisible();
     const cert = await db.certificate.findFirstOrThrow({ where: { courseId: course.id, user: { email } } });
     await page.goto(`/certificates/${cert.publicId}`);
-    await expect(page.getByRole("heading", { name: "Certificate of Completion" })).toBeVisible();
+    await expect(page.locator(".cert-sheet").getByRole("heading", { name: "Certificate", exact: true })).toBeVisible();
+    await expect(page.locator(".cert-sheet").getByText("شهادة إتمام")).toBeVisible();
     await expect(page.locator(".cert-sheet").getByText("Sara Ahmed")).toBeVisible();
     await expect(page.locator(".cert-sheet").getByText(course.titleEn)).toBeVisible();
   });

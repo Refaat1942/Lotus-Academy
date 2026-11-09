@@ -1,4 +1,9 @@
 export const en = {
+  "cert.expired": "Certificate expired", "cert.expired.d": "This certificate was valid until", "cert.renewed": "Renewed", "cert.validUntil": "Valid until",
+  "admin.paths": "Learning paths", "admin.insights": "Learning insights",
+  "learn.renewal": "Certificate renewal", "learn.renewal.desc": "This certificate needs renewing. Your lessons stay complete — pass the final exam again (fresh attempts) to renew it. Due:", "learn.renewal.start": "Retake the final exam",
+  "nav.team": "My team", "nav.paths": "Learning paths", "nav.leaderboard": "Leaderboard",
+  "auth.domainNotAllowed": "Self-registration is limited to company email addresses:",
   "search.placeholder": "I'm looking for a course, topic or drug class…",
   "legal.copyright": "© Lotus Pharmacies — Lotus Academy. This material is the property of Lotus and may not be copied, shared or redistributed without written permission.",
   "learn.finalExam": "Final exam", "learn.finalExam.desc": "You have completed every lesson. Pass the final exam to finish the course and receive your certificate.", "learn.finalExam.start": "Start the final exam",

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Circle, Download, ExternalLink, Lock, ShieldQuestion } from "lucide-react";
 import { db } from "@/lib/db";
+import { enforcePathOrder } from "@/lib/paths";
 import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { renderMarkdown } from "@/lib/markdown";
@@ -11,6 +12,8 @@ import { themeVars } from "@/lib/category-theme";
 import { bookmarkAction, completeLessonAction } from "@/app/actions/learning";
 import { Progress, fmtDuration } from "@/components/ui";
 import { AssistantChat } from "@/components/AssistantChat";
+import { NarratedVideo } from "@/components/NarratedVideo";
+import { parseScenes } from "@/lib/video-script";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   if (!course) notFound();
   const enrollment = await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } });
   if (!enrollment || enrollment.status === "CANCELLED") redirect(`/courses/${slug}`);
+  await enforcePathOrder(user.id, course.id);
 
   const lessons = course.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, moduleId: m.id })));
   const idx = lessons.findIndex((l) => l.slug === lessonSlug);
@@ -68,7 +72,7 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
   const lessonDone = done.has(lesson.id);
   const nextOpen = !!next && (!course.sequential || lessonDone);
   const remaining = lessons.length - done.size;
-  const certificate = enrollment.status === "COMPLETED" ? await db.certificate.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null;
+  const certificate = enrollment.status === "COMPLETED" || enrollment.renewalSince ? await db.certificate.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } }) : null;
   const Prev = dir === "rtl" ? ChevronRight : ChevronLeft;
   const Next = dir === "rtl" ? ChevronLeft : ChevronRight;
   const here = `/learn/${course.slug}/${lesson.slug}`;
@@ -119,6 +123,11 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
           {locale === "en" && lesson.titleAr && <p lang="ar" dir="rtl" className="mt-1 text-muted">{lesson.titleAr}</p>}
 
           <div className="mt-6 space-y-6">
+            {/* No recorded video yet: play the lesson's video script as a narrated scene-by-scene video. */}
+            {!videos.length && (lesson.videoScriptAr || lesson.videoScriptEn) && (
+              <NarratedVideo title={pick(locale, lesson.titleEn, lesson.titleAr)} initialLang={locale === "ar" ? "ar" : "en"}
+                scripts={{ ...(lesson.videoScriptEn ? { en: parseScenes(lesson.videoScriptEn) } : {}), ...(lesson.videoScriptAr ? { ar: parseScenes(lesson.videoScriptAr) } : {}) }} />
+            )}
             {[...videos].sort((a, b) => (a.language === locale ? -1 : 0) - (b.language === locale ? -1 : 0)).map((v) => (
               <div key={v.id} className="space-y-2">
                 {videos.length > 1 && v.language !== "all" && <p className="text-xs font-semibold uppercase tracking-wider text-muted">{v.language === "ar" ? "العربية" : "English"}</p>}
@@ -161,10 +170,13 @@ export default async function LessonPage({ params, searchParams }: { params: Pro
               </section>
             );
           })()}
+          {enrollment.renewalSince && finalExam && (
+            <section className="mt-8 rounded-2xl border-2 border-warning/50 bg-warning/10 p-5"><h2 className="font-bold">{t("learn.renewal")}</h2><p className="mt-1 text-sm text-muted">{t("learn.renewal.desc")}{enrollment.dueAt ? ` ${enrollment.dueAt.toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB")}` : ""}</p><Link className="btn-primary mt-3" href={`/learn/${course.slug}/final-exam`}>{t("learn.renewal.start")}</Link></section>
+          )}
           {!next && lessonDone && finalExam && !certificate && (
             <section className="mt-8 rounded-2xl border-2 p-5" style={{ borderColor: "var(--accent)", background: "var(--soft)" }}><h2 className="font-bold">{t("learn.finalExam")}</h2><p className="mt-1 text-sm text-muted">{t("learn.finalExam.desc")}</p><Link className="btn-primary mt-3" href={`/learn/${course.slug}/final-exam`} style={{ background: "var(--accent)" }}>{t("learn.finalExam.start")}</Link></section>
           )}
-          {certificate && (
+          {certificate && !enrollment.renewalSince && (
             <section className="mt-8 rounded-2xl border border-success/30 bg-success/10 p-5"><h2 className="font-bold text-success">{t("learn.courseDone")}</h2><Link className="btn-primary mt-3" href={`/certificates/${certificate.publicId}`}>{t("learn.viewCert")}</Link></section>
           )}
 

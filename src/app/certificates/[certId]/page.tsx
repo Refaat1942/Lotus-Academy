@@ -19,7 +19,9 @@ export default async function CertificatePage({ params }: { params: Promise<{ ce
     include: { course: { include: { category: true, lessons: { where: { status: "PUBLISHED", deletedAt: null }, orderBy: { position: "asc" }, select: { titleEn: true } } } } },
   });
   if (!cert) notFound();
-  const [issuer, brand] = await Promise.all([db.systemSetting.findUnique({ where: { key: "certificate.issuer" } }), getBrand()]);
+  const [settings, brand] = await Promise.all([db.systemSetting.findMany({ where: { key: { in: ["certificate.issuer", "certificate.signatories", "certificate.template"] } } }), getBrand()]);
+  const setting = (k: string) => settings.find((x) => x.key === k)?.value;
+  const issuer = setting("certificate.issuer") as { en?: string; ar?: string } | undefined;
   const c = cert.course;
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 print:p-0">
@@ -30,8 +32,10 @@ export default async function CertificatePage({ params }: { params: Promise<{ ce
       </div>
       <CertificateView c={{
         publicId: cert.publicId, recipientName: cert.recipientName, courseTitle: cert.courseTitle, courseTitleAr: c.titleAr, courseCode: c.code,
-        categorySlug: c.category?.slug, categoryName: c.category?.nameEn, issuedAt: cert.issuedAt, durationMinutes: c.durationMinutes, lessonCount: c.lessons.length,
-        topics: c.lessons.slice(0, 8).map((l) => l.titleEn.replace(/\s[—-]\s.*$/, "")), issuerName: (issuer?.value as { en?: string } | null)?.en ?? "Lotus Academy",
+        categorySlug: c.category?.slug, categoryName: c.category?.nameEn, categoryNameAr: c.category?.nameAr, issuedAt: cert.issuedAt, renewedAt: cert.renewedAt, expiresAt: cert.expiresAt, durationMinutes: c.durationMinutes, lessonCount: c.lessons.length,
+        topics: c.lessons.slice(0, 8).map((l) => l.titleEn.replace(/\s[—-]\s.*$/, "")), issuerName: issuer?.en || "Lotus Academy", issuerNameAr: issuer?.ar,
+        signatories: Array.isArray(setting("certificate.signatories")) ? (setting("certificate.signatories") as { name?: string; title?: string; titleAr?: string }[]) : undefined,
+        template: typeof setting("certificate.template") === "string" ? (setting("certificate.template") as string) : "gold",
         verifyUrl: `${env.appUrl()}/verify/certificate/${cert.publicId}`, logoSrc: brand.logo ? `/api/brand/logo?v=${brand.logo}` : null,
       }} />
     </div>

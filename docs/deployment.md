@@ -30,3 +30,19 @@ add HTTPS with `sudo certbot --nginx -d <domain>`. Keep `X-Forwarded-Host`/`X-Re
 
 ## 3. Backups & updates
 Install the cron in [backups.md](backups.md). Update: `git pull && docker compose -p lotus-academy up -d --build` (migrations + idempotent seed/import run on start).
+
+## Email (SMTP)
+Add to `.env` on the server, then `docker compose -p lotus-academy up -d`:
+```
+SMTP_HOST=smtp.example.com      # Google Workspace: smtp.gmail.com · Hostinger: smtp.hostinger.com · Brevo: smtp-relay.brevo.com
+SMTP_PORT=587                   # 465 = implicit TLS, 587 = STARTTLS
+SMTP_USER=academy@lotuspharmacies.com
+SMTP_PASS=...                   # Google: an App Password (needs 2-step verification on the mailbox)
+SMTP_FROM="Lotus Academy <academy@lotuspharmacies.com>"
+```
+Then in *Admin → Settings* choose self-registration **verify by email** and set **Allowed email domains** to
+`lotuspharmacies.com`. Check deliveries in *Admin → Emails*. For a third-party relay (e.g. Brevo), add the SPF/DKIM
+DNS records it gives you for the domain so mail is not marked as spam.
+
+## Demo data
+See [demo.md](demo.md): `docker compose -p lotus-academy exec app npm run seed:demo` (and `-- --remove`).

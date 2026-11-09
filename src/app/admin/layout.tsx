@@ -16,12 +16,13 @@ const GROUPS: [string, Item[]][] = [
   ]],
   ["Learning", [
     ["/admin/courses", "admin.courses", "courses.read", "courses"],
+    ["/admin/paths", "admin.paths", "courses.read", "paths"],
     ["/admin/categories", "admin.categories", "courses.write", "categories"],
     ["/admin/quizzes", "admin.quizzes", "courses.read", "quizzes"],
     ["/admin/enrollments", "admin.enrollments", "enrollments.read", "enrollments"],
     ["/admin/certificates", "admin.certificates", "certificates.read", "certificates"],
   ]],
-  ["Insights", [["/admin/reports", "admin.reports", "reports.read", "reports"], ["/admin/compliance", "admin.compliance", "reports.read", "compliance"]]],
+  ["Insights", [["/admin/reports", "admin.reports", "reports.read", "reports"], ["/admin/compliance", "admin.compliance", "reports.read", "compliance"], ["/admin/insights", "admin.insights", "reports.read", "insights"], ["/team", "nav.team", "reports.read", "team"]]],
   ["System", [
     ["/admin/notifications", "admin.notifications", "settings.write", "notifications"],
     ["/admin/emails", "admin.emails", "emails.read", "emails"],

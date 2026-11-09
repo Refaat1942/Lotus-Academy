@@ -52,6 +52,25 @@ export default async function Settings() {
               <option value="email">Open — verify by email (requires SMTP)</option>
               <option value="closed">Closed — only admins create accounts</option>
             </select></div>
+          <div><label className="label" htmlFor="allowedDomains">Allowed email domains for self-registration</label>
+            <input id="allowedDomains" name="allowedDomains" placeholder="lotuspharmacies.com" defaultValue={typeof s["registration.allowedDomains"] === "string" ? (s["registration.allowedDomains"] as string) : ""} className="input" />
+            <p className="mt-1 text-xs text-muted">Comma-separated. Leave empty to allow any email address.</p></div>
+          <div><label className="label" htmlFor="certTemplate">Certificate design</label>
+            <select id="certTemplate" name="certTemplate" defaultValue={s["certificate.template"] === "classic" ? "classic" : "gold"} className="input">
+              <option value="gold">Lotus gold (bilingual, green panel and gold seal)</option>
+              <option value="classic">Classic (course-coloured frame)</option>
+            </select></div>
+          {[1, 2].map((i) => {
+            const sig = (Array.isArray(s["certificate.signatories"]) ? (s["certificate.signatories"] as { name?: string; title?: string; titleAr?: string }[]) : [])[i - 1] ?? {};
+            return (
+              <fieldset key={i} className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-3">
+                <legend className="px-1 text-sm font-semibold">Certificate signature {i}</legend>
+                <div><label className="label" htmlFor={`sig${i}Name`}>Name</label><input id={`sig${i}Name`} name={`sig${i}Name`} defaultValue={sig.name ?? ""} className="input" /></div>
+                <div><label className="label" htmlFor={`sig${i}Title`}>Title (EN)</label><input id={`sig${i}Title`} name={`sig${i}Title`} defaultValue={sig.title ?? (i === 1 ? "Academy Director" : "Head of Training")} className="input" /></div>
+                <div><label className="label" htmlFor={`sig${i}TitleAr`}>Title (AR)</label><input id={`sig${i}TitleAr`} name={`sig${i}TitleAr`} dir="rtl" defaultValue={sig.titleAr ?? (i === 1 ? "مدير الأكاديمية" : "رئيس قطاع التدريب")} className="input" /></div>
+              </fieldset>
+            );
+          })}
           <div><label className="label" htmlFor="contactEmail">Contact email</label><input id="contactEmail" name="contactEmail" type="email" defaultValue={typeof s["contact.email"] === "string" ? (s["contact.email"] as string) : ""} className="input" /></div>
         </ActionForm>
       </section>

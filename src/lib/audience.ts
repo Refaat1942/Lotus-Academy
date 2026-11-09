@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "./db";
 import type { CurrentUser } from "./auth";
+import { syncPaths } from "./paths";
 
 /** Courses a viewer may see: everything for staff, "ALL" courses for everyone, targeted courses for their audience. */
 export function visibleCoursesWhere(user: Pick<CurrentUser, "permissions"> | null, audienceId: string | null): Prisma.CourseWhereInput {
@@ -42,6 +43,8 @@ export async function syncAssignments(opts: { userId?: string; courseId?: string
     await db.notification.createMany({ data: users.map((u) => ({ userId: u.id, type: "assignment", title: "New required course assigned", href: "/dashboard" })) });
     created += r.count;
   }
+  // New hires also receive the onboarding paths of their job role.
+  if (!opts.courseId) created += await syncPaths({ userId: opts.userId });
   return created;
 }
 

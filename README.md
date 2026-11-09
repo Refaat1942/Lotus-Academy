@@ -37,4 +37,4 @@ npm run dev                     # http://localhost:15169
 [architecture](docs/architecture.md) · [database](docs/database.md) · [authentication](docs/authentication.md) ·
 [roles](docs/roles.md) · [course-import](docs/course-import.md) · [environment](docs/environment.md) ·
 [deployment](docs/deployment.md) · [backups](docs/backups.md) · [restore](docs/restore.md) ·
-[content-verification](docs/content-verification.md) · [learning-experience](docs/learning-experience.md) · [testing](docs/testing.md) · [security](docs/security.md) · [troubleshooting](docs/troubleshooting.md)
+[content-verification](docs/content-verification.md) · [learning-experience](docs/learning-experience.md) · [demo](docs/demo.md) · [testing](docs/testing.md) · [security](docs/security.md) · [troubleshooting](docs/troubleshooting.md)

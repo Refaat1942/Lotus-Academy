@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { enforcePathOrder } from "@/lib/paths";
 import { getT, pick } from "@/i18n";
 import { requireUser } from "@/lib/auth";
 import { startAttempt } from "@/lib/learning";
@@ -15,6 +16,7 @@ export default async function FinalExam({ params }: { params: Promise<{ slug: st
   if (!course) notFound();
   const enr = await db.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } } });
   if (!enr || enr.status === "CANCELLED") redirect(`/courses/${slug}`);
+  await enforcePathOrder(user.id, course.id);
   const [total, done] = await Promise.all([
     db.lesson.count({ where: { courseId: course.id, status: "PUBLISHED", deletedAt: null } }),
     db.lessonProgress.count({ where: { userId: user.id, courseId: course.id, completedAt: { not: null }, lesson: { status: "PUBLISHED", deletedAt: null } } }),
@@ -24,7 +26,7 @@ export default async function FinalExam({ params }: { params: Promise<{ slug: st
   if (!quiz) notFound();
   const [view, history] = await Promise.all([
     startAttempt(user.id, quiz.id),
-    db.quizAttempt.findMany({ where: { userId: user.id, quizId: quiz.id, submittedAt: { not: null } }, orderBy: { startedAt: "desc" } }),
+    db.quizAttempt.findMany({ where: { userId: user.id, quizId: quiz.id, submittedAt: { not: null }, ...(enr.renewalSince ? { startedAt: { gte: enr.renewalSince } } : {}) }, orderBy: { startedAt: "desc" } }),
   ]);
   return <QuizTaker title={pick(locale, quiz.titleEn, quiz.titleAr)} passMark={quiz.passMark} view={view} backHref={`/courses/${slug}`} backLabel={t("common.back")} history={history} />;
 }

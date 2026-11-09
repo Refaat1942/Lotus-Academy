@@ -47,7 +47,9 @@ export default async function EditCourse({ params }: { params: Promise<{ id: str
               <div><label className="label" htmlFor="level">Level</label><select id="level" name="level" defaultValue={c.level} className="input"><option>BEGINNER</option><option>INTERMEDIATE</option><option>ADVANCED</option></select></div>
               <div><label className="label" htmlFor="durationMinutes">Duration (minutes)</label><input id="durationMinutes" name="durationMinutes" type="number" min={0} defaultValue={c.durationMinutes} className="input" /></div>
               <div><label className="label" htmlFor="passMark">Pass mark (%)</label><input id="passMark" name="passMark" type="number" min={0} max={100} defaultValue={c.passMark} className="input" /></div>
-              <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="sequential" defaultChecked={c.sequential} /> Learners must finish each lesson (and answer its checkpoint) before the next one unlocks</label>
+              <div><label className="label" htmlFor="validityMonths">Certificate valid for (months)</label><input id="validityMonths" name="validityMonths" type="number" min={0} max={120} defaultValue={c.validityMonths ?? ""} placeholder="No expiry" className="input" />
+                <p className="mt-1 text-xs text-muted">Leave empty for no expiry. 30 days before expiry learners are asked to retake the final exam to renew.</p></div>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="sequential" defaultChecked={c.sequential} /> Learners must finish each lesson (and pass its lesson quiz) before the next one unlocks</label>
               <input type="hidden" name="thumbnailUrl" value={c.thumbnailUrl ?? ""} />
             </ActionForm>
           ) : <p className="text-sm text-muted">You have read-only access.</p>}

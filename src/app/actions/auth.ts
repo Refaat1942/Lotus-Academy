@@ -46,6 +46,12 @@ async function registrationMode(): Promise<"email" | "approval" | "closed"> {
   return v === "closed" || v === "email" ? v : "approval";
 }
 
+/** Optional allow-list of email domains for self-registration (e.g. "lotuspharmacies.com"). Empty = any domain. */
+export async function allowedDomains(): Promise<string[]> {
+  const s = await db.systemSetting.findUnique({ where: { key: "registration.allowedDomains" } });
+  return typeof s?.value === "string" ? s.value.split(/[\s,;]+/).map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter(Boolean) : [];
+}
+
 export async function registerAction(_: State, fd: FormData): Promise<State> {
   const { t } = await getT();
   const mode = await registrationMode();
@@ -55,6 +61,8 @@ export async function registerAction(_: State, fd: FormData): Promise<State> {
   const parsed = registerSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: "Please complete all required fields correctly and accept the terms." };
   const d = parsed.data;
+  const domains = await allowedDomains();
+  if (domains.length && !domains.includes(d.email.split("@")[1]?.toLowerCase() ?? "")) return { error: `${t("auth.domainNotAllowed")} ${domains.map((x) => "@" + x).join(", ")}` };
   const problem = passwordProblem(d.password);
   if (problem) return { error: problem };
 
