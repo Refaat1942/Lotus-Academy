@@ -17,6 +17,6 @@ export function startScheduler() {
       log("error", "reminders.failed", { error: e instanceof Error ? e.message : String(e) });
     }
   };
-  setTimeout(tick, 2 * 60_000);
+  setTimeout(tick, 2 * 60_000).unref?.();
   setInterval(tick, HOUR).unref?.();
 }
